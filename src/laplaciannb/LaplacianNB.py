@@ -6,7 +6,7 @@ from scipy.special import logsumexp
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.naive_bayes import _BaseDiscreteNB
 from sklearn.preprocessing import LabelBinarizer
-from sklearn.utils.validation import _check_sample_weight, check_is_fitted
+from sklearn.utils.validation import _check_sample_weight, check_is_fitted, validate_data
 
 
 class LaplacianNB(_BaseDiscreteNB):
@@ -87,20 +87,20 @@ class LaplacianNB(_BaseDiscreteNB):
     """
 
     # see https://github.com/scikit-learn/scikit-learn/pull/22269 for an explanation
-    force_alpha = False
 
-    def __init__(self, *, alpha=1.0, fit_prior=True, class_prior=None):
+    def __init__(self, *, alpha=1.0, force_alpha=True, fit_prior=True, class_prior=None):
         self.alpha = alpha
         self.fit_prior = fit_prior
         self.class_prior = class_prior
+        force_alpha = force_alpha
 
     def _check_X(self, X):
         """Validate X, used only in predict* methods."""
-        X = super()._validate_data(X, reset=False, dtype="object", ensure_2d=False)
+        X = validate_data(self, X, reset=False, dtype="object", ensure_2d=False)
         return X
 
     def _check_X_y(self, X, y, reset=True):
-        X, y = super()._validate_data(X, y, reset=True, dtype="object", ensure_2d=False)
+        X, y = validate_data(self, X, y, reset=True, dtype="object", ensure_2d=False)
         return X, y
 
     def _sum_sets(self, set_list):

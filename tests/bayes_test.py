@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from numpy.testing import assert_array_equal
 
-from laplaciannb.LaplacianNB import LaplacianNB
+from src.laplaciannb.LaplacianNB import LaplacianNB
 
 
 def test_bayes():
@@ -41,7 +41,7 @@ def test_lmnb_prior_unobserved_targets():
 
 def test_rdkit():
     from rdkit import Chem
-    from rdkit.Chem import AllChem
+    from rdkit.Chem import rdFingerprintGenerator
 
     from src.laplaciannb.LaplacianNB import LaplacianNB
 
@@ -57,8 +57,9 @@ def test_rdkit():
         """
 
         mol = Chem.MolFromSmiles(smiles)
-        fp = AllChem.GetMorganFingerprint(mol, 2)
-        return set(fp.GetNonzeroElements().keys())
+        mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2)
+        fp = mfpgen.GetSparseFingerprint(mol)
+        return set(fp.GetOnBits())
 
     DATA_PATH = Path(__file__).parent.parent.joinpath("tests/data/")
     file = str(DATA_PATH.joinpath("smiles_test.csv"))
@@ -78,7 +79,7 @@ def test_rdkit():
 
 def test_joint_log_likelihood():
     from rdkit import Chem
-    from rdkit.Chem import AllChem
+    from rdkit.Chem import rdFingerprintGenerator
 
     from src.laplaciannb.LaplacianNB import LaplacianNB
 
@@ -94,8 +95,9 @@ def test_joint_log_likelihood():
         """
 
         mol = Chem.MolFromSmiles(smiles)
-        fp = AllChem.GetMorganFingerprint(mol, 2)
-        return set(fp.GetNonzeroElements().keys())
+        mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2)
+        fp = mfpgen.GetSparseFingerprint(mol)
+        return set(fp.GetOnBits())
 
     DATA_PATH = Path(__file__).parent.parent.joinpath("tests/data/")
     file = str(DATA_PATH.joinpath("smiles_test.csv"))

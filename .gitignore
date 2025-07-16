@@ -70,3 +70,4 @@ _configtest.o.d
 
 # Pdm
 .pdm-python
+*egg-info/
