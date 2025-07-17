@@ -1,21 +1,28 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "laplaciannb"
-version = "0.6.0"
+version = "0.6.1"
 description = "**LaplacianNB** is a Python module developed at **Novartis AG** for Naive Bayes classifier for laplacian modified models based on scikit-learn Naive Bayes implementation."
 authors = [
     {name = "Bartosz Baranowski",email = "bartosz.baranowski@novartis.com"},
 ]
-dependencies = ["rdkit>=2024.3.5", "scikit-learn>=1.5.2", "pandas>=2.2.3", "scipy>=1.6.0"]
-requires-python = ">=3.9"
+dependencies = [
+    "rdkit>=2024.3.5",
+    "scikit-learn>=1.7.0",
+    "pandas>=2.2.3",
+    "scipy>=1.6.0"
+]
+requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "BSD 3"}
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
-
-
 [dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
 test = ["ruff>=0.7.2", "pytest>=8.3.3", "pre-commit>=4.0.1"]
 
 [tool.ruff]
@@ -47,7 +54,4 @@ skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
-
-[tool.pdm]
-distribution = true
 

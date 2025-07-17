@@ -1,35 +1,41 @@
-# LaplacianNB
+<h1 align="center">LaplacianNB</h1>
 
-<div>
+<p align="center">
+  <b>Naive Bayes classifier for Laplacian-modified models</b><br>
+  <i>Efficient, scikit-learn compatible, and designed for binary/boolean data</i>
+</p>
 
-| | |
-| --- | --- |
-| Package | [![PyPI - Version](https://img.shields.io/pypi/v/laplaciannb.svg?logo=pypi&label=PyPI&logoColor=gold)](https://pypi.org/project/laplaciannbs/) [![PyPI - Downloads](https://img.shields.io/pypi/dm/laplaciannb.svg?color=blue&label=Downloads&logo=pypi&logoColor=gold)](https://pypi.org/project/laplaciannb/) [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/laplaciannb.svg?logo=python&label=Python&logoColor=gold)](https://pypi.org/project/laplaciannb/) |
-| Meta | [![code style - black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) [![types - Mypy](https://img.shields.io/badge/types-Mypy-blue.svg)](https://github.com/python/mypy) [![imports - isort](https://img.shields.io/badge/imports-isort-ef8336.svg)](https://github.com/pycqa/isort) [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) |
-| | |
+<p align="center">
+  <a href="https://pypi.org/project/laplaciannb/"><img src="https://img.shields.io/pypi/v/laplaciannb.svg?logo=pypi&label=PyPI&logoColor=gold" alt="PyPI Version"></a>
+  <a href="https://pypi.org/project/laplaciannb/"><img src="https://img.shields.io/pypi/dm/laplaciannb.svg?color=blue&label=Downloads&logo=pypi&logoColor=gold" alt="PyPI Downloads"></a>
+  <a href="https://pypi.org/project/laplaciannb/"><img src="https://img.shields.io/pypi/pyversions/laplaciannb.svg?logo=python&label=Python&logoColor=gold" alt="Python Versions"></a>
+</p>
 
-</div>
+**LaplacianNB** is a Python module developed at **Novartis AG** for a Naive Bayes classifier for Laplacian-modified models, based on the scikit-learn Naive Bayes implementation.
 
-**LaplacianNB** is a Python module developed at **Novartis AG** for a Naive Bayes classifier for Laplacian modified models based on the scikit-learn Naive Bayes implementation.
+This classifier is ideal for binary/boolean data, using only the indices of positive bits for efficient prediction. The algorithm was first implemented in Pipeline Pilot and KNIME.
 
-This classifier is suitable for binary/boolean data as it uses only indices of the positive bits for prediction. The algorithm was first implemented in Pipeline Pilot and KNIME.
+---
 
-## Features
+## 🚀 Features
 
-- Naive Bayes classifier for Laplacian modified models
-- Suitable for binary/boolean data
-- Efficient prediction using indices of positive bits
+- **Naive Bayes classifier** for Laplacian-modified models
+- **Optimized for binary/boolean data**
+- **Fast prediction** using indices of positive bits
+- **scikit-learn compatible API**
+- Lightweight and easy to integrate
 
-## Installation
+---
 
-You can install the package using pip:
+## 📦 Installation
+
+Install the latest release from PyPI:
 
 ```sh
 pip install laplaciannb
 ```
 
-
-## Literature
+## 📚 Literature
 
 ```
 Nidhi; Glick, M.; Davies, J. W.; Jenkins, J. L. Prediction of biological targets
@@ -42,20 +48,23 @@ in a zebrafish heart-failure model. Chem Bio Chem. 2020:cbic.201900741.
 https://doi.org/10.1002/cbic.201900741
 ```
 
-## Authors
+---
 
-Author and maintainer: **Bartosz Baranowski** (bartosz.baranowski@novartis.com)
+## 👤 Authors & Maintainers
 
-## Maintainers
-
-- **Bartosz Baranowski** (bartosz.baranowski@novartis.com)
+- **Bartosz Baranowski** (bartosz.baranowski@novartis.com)  
 - **Edgar Harutyunyan** (edgar.harutyunyan_ext@novartis.com)
 
-## Changelog
+---
 
+## 📝 Changelog
+
+- `v0.6.1` - Fixes for scikit-learn 1.7, rdkit 2025+ compatibility, move to uv build
 - `v0.6.0` - Move to pdm build
 - `v0.5.0` - Initial release
 
-## License
+---
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+## 📄 License
+
+This project is licensed under the BSD 3-Clause License. See the [LICENSE](LICENSE) file for details.
