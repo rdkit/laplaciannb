@@ -15,6 +15,8 @@
 
 This classifier is ideal for binary/boolean data, using only the indices of positive bits for efficient prediction. The algorithm was first implemented in Pipeline Pilot and KNIME.
 
+The package also includes comprehensive utilities for converting RDKit molecular fingerprints to sklearn-compatible formats.
+
 ---
 
 ## 🚀 Features
@@ -23,6 +25,8 @@ This classifier is ideal for binary/boolean data, using only the indices of posi
 - **Optimized for binary/boolean data**
 - **Fast prediction** using indices of positive bits
 - **scikit-learn compatible API**
+- **RDKit fingerprint conversion utilities**
+- **Support for sparse and dense data formats**
 - Lightweight and easy to integrate
 
 ---
@@ -33,6 +37,73 @@ Install the latest release from PyPI:
 
 ```sh
 pip install laplaciannb
+```
+
+## 🔬 Quick Start
+
+### Basic Usage with LaplacianNB
+
+```python
+import numpy as np
+from laplaciannb import LaplacianNB
+
+# Create sample data (sets of positive bit indices)
+X = np.array([
+    {1, 5, 10, 15},      # Sample 1: bits 1,5,10,15 are on
+    {2, 6, 11, 16},      # Sample 2: bits 2,6,11,16 are on  
+    {1, 3, 7, 12},       # Sample 3: bits 1,3,7,12 are on
+], dtype=object)
+y = np.array([0, 1, 0])  # Class labels
+
+# Train the classifier
+clf = LaplacianNB()
+clf.fit(X, y)
+
+# Make predictions
+predictions = clf.predict(X)
+probabilities = clf.predict_proba(X)
+```
+
+### RDKit Fingerprint Integration
+
+```python
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from laplaciannb import LaplacianNB, convert_fingerprints
+
+# Generate molecular fingerprints
+molecules = [Chem.MolFromSmiles(smi) for smi in ['CCO', 'CC', 'CCC']]
+fingerprints = [AllChem.GetMorganFingerprintAsBitVect(mol, 2) for mol in molecules]
+
+# Convert to sklearn-compatible format
+X = convert_fingerprints(fingerprints, output_format='csr')
+y = [0, 1, 0]
+
+# Train classifier
+clf = LaplacianNB()
+clf.fit(X, y)
+```
+
+### Advanced Fingerprint Conversion
+
+```python
+from laplaciannb import RDKitFingerprintConverter
+
+# Create converter with custom settings
+converter = RDKitFingerprintConverter(
+    n_bits=2048, 
+    output_format='auto',  # Automatically choose sparse/dense
+    dtype=np.float32
+)
+
+# Convert fingerprints
+X_dense = converter.to_dense(fingerprints)
+X_sparse = converter.to_csr(fingerprints)
+
+# Get statistics
+stats = converter.get_statistics(fingerprints)
+print(f"Sparsity: {stats['sparsity']:.2%}")
+print(f"Average on-bits: {stats['avg_on_bits']:.1f}")
 ```
 
 ## 📚 Literature

@@ -20,10 +20,12 @@ readme = "README.md"
 license = {text = "BSD 3"}
 
 [dependency-groups]
-dev = [
-    "pytest>=8.4.1",
+test = [
+    "ruff>=0.7.2",
+    "pytest>=8.3.3",
+    "pre-commit>=4.0.1",
+    "psutil>=7.0.0",
 ]
-test = ["ruff>=0.7.2", "pytest>=8.3.3", "pre-commit>=4.0.1"]
 
 [tool.ruff]
 line-length = 119
