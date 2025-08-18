@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from numpy.testing import assert_array_equal
 
-from src.laplaciannb.LaplacianNB import LaplacianNB
+from src.laplaciannb.legacy.LaplacianNB import LaplacianNB
 
 
 def test_bayes():
@@ -43,7 +43,7 @@ def test_rdkit():
     from rdkit import Chem
     from rdkit.Chem import rdFingerprintGenerator
 
-    from src.laplaciannb.LaplacianNB import LaplacianNB
+    from src.laplaciannb.legacy.LaplacianNB import LaplacianNB
 
     def get_fp(smiles: str) -> set:
         """Function to calculate MorganFingerprint from smiles.
@@ -81,7 +81,7 @@ def test_joint_log_likelihood():
     from rdkit import Chem
     from rdkit.Chem import rdFingerprintGenerator
 
-    from src.laplaciannb.LaplacianNB import LaplacianNB
+    from src.laplaciannb.legacy.LaplacianNB import LaplacianNB
 
     def get_fp(smiles: str) -> set:
         """Function to calculate MorganFingerprint from smiles.

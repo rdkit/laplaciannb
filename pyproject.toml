@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laplaciannb"
-version = "0.6.1"
+dynamic = ["version"]
 description = "**LaplacianNB** is a Python module developed at **Novartis AG** for Naive Bayes classifier for laplacian modified models based on scikit-learn Naive Bayes implementation."
 authors = [
     {name = "Bartosz Baranowski",email = "bartosz.baranowski@novartis.com"},
@@ -57,3 +57,5 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
+[tool.setuptools.dynamic]
+version = {attr = "laplaciannb.__version__"}

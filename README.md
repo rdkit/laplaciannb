@@ -15,18 +15,20 @@
 
 This classifier is ideal for binary/boolean data, using only the indices of positive bits for efficient prediction. The algorithm was first implemented in Pipeline Pilot and KNIME.
 
-The package also includes comprehensive utilities for converting RDKit molecular fingerprints to sklearn-compatible formats.
+The package includes both a **modern sklearn-compatible implementation** (recommended) and a legacy version for backward compatibility.
 
 ---
 
 ## 🚀 Features
 
-- **Naive Bayes classifier** for Laplacian-modified models
+- **Modern sklearn-compatible implementation** with full ecosystem integration
+- **Naive Bayes classifier** for Laplacian-modified models  
 - **Optimized for binary/boolean data**
 - **Fast prediction** using indices of positive bits
-- **scikit-learn compatible API**
 - **RDKit fingerprint conversion utilities**
 - **Support for sparse and dense data formats**
+- **Pipeline, cross-validation, and grid search support**
+- **Memory-efficient sparse matrix handling**
 - Lightweight and easy to integrate
 
 ---
@@ -40,6 +42,103 @@ pip install laplaciannb
 ```
 
 ## 🔬 Quick Start
+
+### Recommended Usage (Modern sklearn-compatible API)
+
+```python
+import numpy as np
+from laplaciannb import LaplacianNB
+from laplaciannb.fingerprint_utils import convert_fingerprints
+
+# Convert fingerprint data to sklearn format
+fingerprints = [
+    {1, 5, 10, 15},      # Fingerprint as set of bit indices
+    {2, 6, 11, 16},      # Each set represents active bits
+    {1, 3, 7, 12}
+]
+X = convert_fingerprints(fingerprints, n_bits=20)
+y = [0, 1, 0]
+
+# Train and predict
+clf = LaplacianNB(alpha=1.0)
+clf.fit(X, y)
+predictions = clf.predict(X)
+probabilities = clf.predict_proba(X)
+```
+
+### sklearn Ecosystem Integration
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV, cross_val_score
+from laplaciannb import LaplacianNB, FingerprintTransformer
+
+# Create pipeline
+pipeline = Pipeline([
+    ('fingerprints', FingerprintTransformer(n_bits=2048)),
+    ('classifier', LaplacianNB())
+])
+
+# Grid search
+param_grid = {
+    'classifier__alpha': [0.1, 1.0, 10.0],
+    'fingerprints__output_format': ['csr', 'dense']
+}
+grid_search = GridSearchCV(pipeline, param_grid, cv=5)
+grid_search.fit(fingerprints, y)
+
+# Cross-validation
+cv_scores = cross_val_score(pipeline, fingerprints, y, cv=5)
+```
+
+### Legacy Usage (Deprecated)
+
+```python
+# ⚠️ DEPRECATED: Use only for backward compatibility
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+from laplaciannb.legacy import LaplacianNB as LegacyLaplacianNB
+
+# Legacy format (sets of bit indices)
+X_sets = np.array([{1, 5, 10}, {2, 6, 11}, {1, 3, 7}], dtype=object)
+y = [0, 1, 0]
+
+clf = LegacyLaplacianNB(alpha=1.0)
+clf.fit(X_sets, y)
+predictions = clf.predict(X_sets)
+```
+
+## 📋 Migration Guide
+
+**Migrating from legacy to modern implementation:**
+
+1. **Update imports:**
+   ```python
+   # Before
+   from laplaciannb.legacy import LaplacianNB
+   
+   # After  
+   from laplaciannb import LaplacianNB
+   from laplaciannb.fingerprint_utils import convert_fingerprints
+   ```
+
+2. **Convert input data:**
+   ```python
+   # Convert fingerprint sets to sklearn format
+   X = convert_fingerprints(your_fingerprint_sets, n_bits=your_size)
+   ```
+
+3. **Same API for basic usage:**
+   ```python
+   clf = LaplacianNB(alpha=1.0)
+   clf.fit(X, y)
+   predictions = clf.predict(X)
+   ```
+
+See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for detailed migration instructions.
+
+---
 
 ### Basic Usage with LaplacianNB
 
