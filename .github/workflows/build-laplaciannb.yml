@@ -45,7 +45,7 @@ jobs:
       # Step 5: Run tests before building
       - name: Run tests
         run: |
-          uv run python -m pytest tests/ --tb=short
+          uv run coverage run -m pytest tests/ --tb=short
 
       # Step 6: Build distribution using modern build tool
       - name: Build distribution

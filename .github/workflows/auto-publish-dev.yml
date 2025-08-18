@@ -72,7 +72,7 @@ jobs:
 
       - name: Run tests before publishing
         run: |
-          uv run python -m pytest tests/ -x --tb=short
+          uv run coverage run -m pytest tests/ -x --tb=short
 
       - name: Generate development version
         id: version

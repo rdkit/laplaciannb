@@ -61,3 +61,35 @@ line-ending = "auto"
 
 [tool.setuptools.dynamic]
 version = {attr = "laplaciannb.__version__"}
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "tests/*",
+    "*/tests/*", 
+    "test_*",
+    "*/.venv/*",
+    "*/site-packages/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+skip_covered = false
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.html]
+directory = "htmlcov"

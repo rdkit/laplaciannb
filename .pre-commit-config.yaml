@@ -49,7 +49,7 @@ repos:
       # Run pytest with coverage (matches CI coverage workflow)
       - id: pytest-check
         name: pytest-with-coverage
-        entry: python -m pytest tests/ --tb=short -x
+        entry: coverage run -m pytest tests/ --tb=short -x
         language: system
         pass_filenames: false
         always_run: true
