@@ -184,9 +184,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-dev = [
-    { name = "coverage", extra = ["toml"] },
-]
 test = [
     { name = "coverage", extra = ["toml"] },
     { name = "pre-commit" },
@@ -205,7 +202,6 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "coverage", extras = ["toml"], specifier = ">=7.10.4" }]
 test = [
     { name = "coverage", extras = ["toml"], specifier = ">=7.0.0" },
     { name = "pre-commit", specifier = ">=4.0.1" },

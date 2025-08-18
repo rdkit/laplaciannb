@@ -64,9 +64,10 @@ version = {attr = "laplaciannb.__version__"}
 
 [tool.coverage.run]
 source = ["src"]
+relative_files = true
 omit = [
     "tests/*",
-    "*/tests/*", 
+    "*/tests/*",
     "test_*",
     "*/.venv/*",
     "*/site-packages/*"
