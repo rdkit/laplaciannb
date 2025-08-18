@@ -328,16 +328,11 @@ class TestSklearnIntegration:
 
         assert pred_empty.shape == (3,)
 
-    @pytest.mark.skipif(
-        not pytest.importorskip("rdkit", reason="RDKit not available"), reason="RDKit required for this test"
-    )
     def test_rdkit_sklearn_pipeline(self):
         """Test full pipeline with RDKit fingerprints (if available)."""
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import rdFingerprintGenerator
-        except ImportError:
-            pytest.skip("RDKit not available")
+        pytest.importorskip("rdkit", reason="RDKit required for this test")
+        from rdkit import Chem
+        from rdkit.Chem import rdFingerprintGenerator
 
         def get_fp(smiles: str, n_bits: int = 1024) -> set:
             """Calculate folded Morgan fingerprint from SMILES with fixed size."""
