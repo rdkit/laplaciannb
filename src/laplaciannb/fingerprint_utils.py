@@ -333,7 +333,7 @@ def rdkit_sparse_to_sklearn(
         else:
             return csr_matrix.toarray()
     else:
-        raise ValueError(f"Unknown output_format: {output_format}. " "Choose from 'auto', 'dense', 'csr', 'csc'.")
+        raise ValueError(f"Unknown output_format: {output_format}. Choose from 'auto', 'dense', 'csr', 'csc'.")
 
 
 class RDKitFingerprintConverter:
@@ -446,9 +446,7 @@ class RDKitFingerprintConverter:
                 try:
                     iter(fp)
                 except TypeError:
-                    raise ValueError(
-                        f"Fingerprint at index {i} is not in a supported format. " f"Got type: {type(fp)}"
-                    )
+                    raise ValueError(f"Fingerprint at index {i} is not in a supported format. Got type: {type(fp)}")
 
     @staticmethod
     def get_sparsity(matrix) -> float:
