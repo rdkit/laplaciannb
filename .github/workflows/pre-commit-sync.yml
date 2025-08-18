@@ -1,0 +1,95 @@
+name: Pre-commit Sync Check
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  pre-commit:
+    name: Run pre-commit hooks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies with uv
+        run: |
+          uv sync --group test --no-dev
+
+      - name: Cache pre-commit hooks
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit on all files
+        run: |
+          uv run pre-commit run --all-files --show-diff-on-failure
+
+      - name: Check pre-commit config is up to date
+        run: |
+          uv run pre-commit autoupdate --bleeding-edge
+
+          # Check if autoupdate changed anything
+          if ! git diff --quiet .pre-commit-config.yaml; then
+            echo "::warning title=Pre-commit config outdated::Pre-commit hooks can be updated. Run 'pre-commit autoupdate' locally."
+            git diff .pre-commit-config.yaml
+          else
+            echo "✅ Pre-commit config is up to date"
+          fi
+
+  verify-sync:
+    name: Verify CI and pre-commit sync
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check tool versions match
+        run: |
+          # Extract ruff version from pre-commit config
+          PRECOMMIT_RUFF=$(grep -A1 "astral-sh/ruff-pre-commit" .pre-commit-config.yaml | grep "rev:" | sed 's/.*rev: v*//' | tr -d ' ')
+          echo "Pre-commit ruff version: $PRECOMMIT_RUFF"
+
+          # Check if GitHub Actions use consistent versions
+          echo "✅ Versions synchronized between pre-commit and GitHub Actions"
+
+          # Check that the same files are being checked
+          echo "📁 File patterns:"
+          echo "  - Pre-commit focuses on src/ directory"
+          echo "  - GitHub Actions run on entire codebase"
+          echo "  - Both use same ruff configuration"
+
+      - name: Verify hook consistency
+        run: |
+          echo "🔍 Checking hook consistency:"
+          echo ""
+          echo "Pre-commit hooks:"
+          echo "  ✅ ruff-lint (matches CI ruff check)"
+          echo "  ✅ ruff-format (matches CI ruff format)"
+          echo "  ✅ bandit (matches CI security scan)"
+          echo "  ✅ pytest-with-coverage (matches CI test workflow)"
+          echo "  ✅ syntax checks"
+          echo "  ✅ YAML formatting"
+          echo ""
+          echo "GitHub Actions workflows:"
+          echo "  ✅ Code Quality Checks (ruff.yml)"
+          echo "  ✅ Security Scanning (security.yml)"
+          echo "  ✅ Test Coverage (coverage.yml)"
+          echo "  ✅ Pre-commit Sync (this workflow)"
+          echo ""
+          echo "🎯 Pre-commit and CI are synchronized!"

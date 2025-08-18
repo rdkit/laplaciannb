@@ -1,0 +1,80 @@
+name: Auto-merge Dependabot PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  auto-merge:
+    name: Auto-merge safe Dependabot updates
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Check if PR is ready
+        id: ready
+        run: |
+          if [[ "${{ github.event.pull_request.draft }}" == "false" ]]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Auto-approve safe updates
+        if: |
+          steps.ready.outputs.ready == 'true' && (
+            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+            steps.metadata.outputs.update-type == 'version-update:semver-minor'
+          )
+        run: |
+          gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge safe updates
+        if: |
+          steps.ready.outputs.ready == 'true' && (
+            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+            (steps.metadata.outputs.update-type == 'version-update:semver-minor' &&
+             contains(fromJSON('["github-actions", "pytest", "ruff", "pre-commit", "coverage"]'), steps.metadata.outputs.dependency-name))
+          )
+        run: |
+          gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on major updates
+        if: |
+          steps.ready.outputs.ready == 'true' &&
+          steps.metadata.outputs.update-type == 'version-update:semver-major'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚨 **Major Version Update**
+
+              This PR contains a major version update for \`${{ steps.metadata.outputs.dependency-name }}\`.
+              Please review carefully for breaking changes before merging.
+
+              **Update Type:** ${{ steps.metadata.outputs.update-type }}
+              **From:** ${{ steps.metadata.outputs.previous-version }}
+              **To:** ${{ steps.metadata.outputs.new-version }}
+
+              Check the changelog and run tests locally before approving.`
+            });

@@ -1,0 +1,97 @@
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 8
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    # Group updates to reduce PR noise
+    groups:
+      # Group all patch and minor updates
+      non-breaking:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      # Group testing and dev tools
+      dev-tools:
+        patterns:
+          - "pytest*"
+          - "coverage*"
+          - "ruff*"
+          - "pre-commit*"
+          - "bandit*"
+        update-types:
+          - "minor"
+          - "patch"
+          - "major"
+    # Be conservative with major updates for core dependencies
+    ignore:
+      - dependency-name: "scikit-learn"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "rdkit"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Pre-commit hooks (NEW!)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:15"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "pre-commit"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "pre-commit"
+      - "code-quality"
+    # Only update pre-commit related dependencies
+    allow:
+      - dependency-name: "pre-commit"
+      - dependency-name: "ruff*"
+      - dependency-name: "bandit*"
+      - dependency-name: "prettier*"
+    groups:
+      pre-commit-hooks:
+        patterns:
+          - "pre-commit*"
+          - "ruff*"
+          - "bandit*"
+        update-types:
+          - "minor"
+          - "patch"

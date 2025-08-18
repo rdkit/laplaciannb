@@ -1,12 +1,12 @@
 name: Build and publish to PyPI and TestPyPI
 
-## from packaging tutorial: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
+# from packaging tutorial: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
 
 # Trigger the workflow on push to a tag (used for releases)
 on:
   push:
     tags:
-      - "v*"  # Push events to matching v*, like v1.0, v20.15.10
+      - "v*" # Push events to matching v*, like v1.0, v20.15.10
 
 jobs:
   build:
@@ -21,40 +21,41 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Miniconda
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v2
+      # Step 2: Set up uv and Python
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          auto-activate-base: false
+          version: "latest"
 
-      # Step 3: Create and activate a new environment called "buildenv"
-      - name: Create & activate Build Env
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Step 3: Install dependencies and tools
+      - name: Install dependencies with uv
         run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n buildenv python=3.9 rdkit -c conda-forge
-          conda activate buildenv
-      
-      # Step 4: Install build tools(pip, pdm, twine)
+          uv sync --group test --no-dev
+
+      # Step 4: Install build tools
       - name: Install build tools
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          pip install --upgrade pip 
-          pip install pdm twine
+          uv add --dev build twine
 
-      # Step 5: Build a binary wheel and a source tarball
-      - name: Build a binary wheel and a source tarball
+      # Step 5: Run tests before building
+      - name: Run tests
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          pdm build
+          uv run coverage run -m pytest tests/ --tb=short
+
+      # Step 6: Build distribution using modern build tool
+      - name: Build distribution
+        run: |
+          uv run python -m build
 
       # Step 6: Validate the distribution
       - name: Validate the distribution
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          twine check dist/*
+          uv run twine check dist/*
 
       # Step 7: Store the distribution artifacts for later use
       - name: Store the distribution artifacts
@@ -67,7 +68,7 @@ jobs:
     name: Publish Python distribution to PyPI
     needs: build
     runs-on: ubuntu-latest
-    if: "! contains(github.ref_name, '-')" # Only run for stable tags (no '-' in tag name)
+    if: ${{ !contains(github.ref_name, '-') }} # Only run for stable tags (no '-' in tag name)
     defaults:
       run:
         shell: bash
@@ -76,6 +77,7 @@ jobs:
       url: https://pypi.org/project/laplaciannb/
     permissions:
       contents: read
+      id-token: write # For trusted publishing
     steps:
       # Step 1: Download the distribution artifacts
       - name: Download all the dists
@@ -84,31 +86,15 @@ jobs:
           name: python-package-distributions
           path: dist
 
-      # Step 2: Set up Miniconda
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-activate-base: false
+      # Step 2: The PyPI publish step doesn't need additional setup
+      # since it only uses the official publish action
 
-      # Step 3: Create and activate a new environment called "pypienv"
-      - name: Create & activate PyPi Env
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n pypienv python=3.9 rdkit -c conda-forge
-          conda activate pypienv
-          pip install --upgrade pip 
-          pip install twine
-
-      # Step 4: Publish distribution to PyPI
+      # Step 3: Publish distribution to PyPI using official action
       - name: Publish distribution to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda activate pypienv
-          twine upload --non-interactive --repository-url https://upload.pypi.org/legacy/ dist/*
-  
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+
   publish-to-testpypi:
     name: Publish Python distribution to TestPyPI
     needs: build
@@ -122,6 +108,7 @@ jobs:
       url: https://test.pypi.org/project/laplaciannb/
     permissions:
       contents: read
+      id-token: write # For trusted publishing
     steps:
       # Step 1: Download the distribution artifacts
       - name: Download all the dists
@@ -130,31 +117,15 @@ jobs:
           name: python-package-distributions
           path: dist
 
-      # Step 2: Set up Miniconda
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-activate-base: false
-
-      # Step 3: Create and activate a new environment called "testenv"
-      - name: Create & activate Test Env
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n testenv python=3.9 rdkit -c conda-forge
-          conda activate testenv
-          pip install --upgrade pip 
-          pip install twine
-
-      # Step 4: Publish distribution to TestPyPI
+      # Step 2: The TestPyPI publish step doesn't need additional setup
+      # since it only uses the official publish action
+      # Step 3: Publish distribution to TestPyPI using official action
       - name: Publish distribution to TestPyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda activate testenv
-          twine upload --verbose --non-interactive --repository-url https://test.pypi.org/legacy/ dist/*
-  
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+
   github-release:
     name: Create a GitHub release
     needs: build
@@ -183,7 +154,6 @@ jobs:
       # Step 4: Create a GitHub release
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1
-        id: create_release
         with:
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
@@ -192,22 +162,5 @@ jobs:
             - This is the automatically generated release notes for ${{ github.ref_name }}.
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }} # Set to true for beta releases
-      
-      # Step 5: Attach the distribution artifacts to the GitHub release
-      - name: Attach the distribution artifacts to the GitHub release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Listing dist files before upload:"
-          ls -l dist
-          UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-          for file in dist/*; do
-            echo "Uploading $file..."
-            asset_name=$(basename "$file")
-            echo "Asset name: $asset_name"
-            curl --data-binary @"$file" \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              "${UPLOAD_URL}?name=$asset_name"
-            echo "✅ Uploaded: $asset_name"
-          done
+          artifacts: "dist/*"
+          artifactContentType: application/octet-stream
