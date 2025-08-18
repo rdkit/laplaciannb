@@ -78,13 +78,13 @@ predictions = clf.predict(X)
    from sklearn.pipeline import Pipeline
    from sklearn.model_selection import GridSearchCV
    from laplaciannb import LaplacianNB, FingerprintTransformer
-   
+
    # Pipeline support
    pipeline = Pipeline([
        ('fingerprints', FingerprintTransformer(n_bits=2048)),
        ('classifier', LaplacianNB())
    ])
-   
+
    # Grid search support
    param_grid = {'classifier__alpha': [0.1, 1.0, 10.0]}
    grid_search = GridSearchCV(pipeline, param_grid, cv=5)
@@ -112,7 +112,7 @@ predictions = clf.predict(X)
 # Before
 from laplaciannb.legacy import LaplacianNB
 
-# After  
+# After
 from laplaciannb import LaplacianNB
 from laplaciannb.fingerprint_utils import convert_fingerprints
 ```

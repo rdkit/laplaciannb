@@ -1,0 +1,71 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  coverage:
+    name: Test Coverage Report
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-activate-base: false
+          python-version: '3.9'
+
+      - name: Cache conda environment
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-coverage-${{ hashFiles('pyproject.toml') }}
+
+      - name: Create test environment
+        run: |
+          eval "$(conda shell.bash hook)"
+          conda create -y -n testenv python=3.9 rdkit -c conda-forge
+          conda activate testenv
+          pip install --upgrade pip
+          pip install -e .[test] coverage[toml] pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          eval "$(conda shell.bash hook)"
+          conda activate testenv
+          python -m pytest tests/ \
+            --cov=laplaciannb \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --cov-fail-under=80 \
+            --tb=short
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: laplaciannb-coverage
+          fail_ci_if_error: false
+
+      - name: Upload HTML coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-html-report
+          path: htmlcov/
+
+      - name: Coverage comment
+        if: github.event_name == 'pull_request'
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 80
+          MINIMUM_ORANGE: 70
