@@ -21,54 +21,41 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Conda with caching
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
+      # Step 2: Set up uv and Python
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          auto-activate-base: false
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
           python-version: "3.10"
 
-      - name: Cache conda packages
-        uses: actions/cache@v4
-        with:
-          path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-build-${{ hashFiles('pyproject.toml') }}
-
-      # Step 3: Create and activate build environment
-      - name: Create & activate Build Env
+      # Step 3: Install dependencies and tools
+      - name: Install dependencies with uv
         run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n buildenv python=3.10 rdkit -c conda-forge
-          conda activate buildenv
+          uv sync --group test --no-dev
 
       # Step 4: Install build tools
       - name: Install build tools
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          pip install --upgrade pip build twine
+          uv add --dev build twine
 
       # Step 5: Run tests before building
       - name: Run tests
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          pip install -e .[test]
-          python -m pytest tests/ --tb=short
+          uv run python -m pytest tests/ --tb=short
 
       # Step 6: Build distribution using modern build tool
       - name: Build distribution
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          python -m build
+          uv run python -m build
 
       # Step 6: Validate the distribution
       - name: Validate the distribution
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          twine check dist/*
+          uv run twine check dist/*
 
       # Step 7: Store the distribution artifacts for later use
       - name: Store the distribution artifacts
@@ -99,22 +86,10 @@ jobs:
           name: python-package-distributions
           path: dist
 
-      # Step 2: Set up Miniconda
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-activate-base: false
+      # Step 2: The PyPI publish step doesn't need additional setup
+      # since it only uses the official publish action
 
-      # Step 3: Create and activate a new environment called "pypienv"
-      - name: Create & activate PyPi Env
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n pypienv python=3.10 rdkit -c conda-forge
-          conda activate pypienv
-          pip install --upgrade pip
-          pip install twine
-
-      # Step 4: Publish distribution to PyPI using official action
+      # Step 3: Publish distribution to PyPI using official action
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
@@ -142,22 +117,9 @@ jobs:
           name: python-package-distributions
           path: dist
 
-      # Step 2: Set up Miniconda
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-activate-base: false
-
-      # Step 3: Create and activate a new environment called "testenv"
-      - name: Create & activate Test Env
-        run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n testenv python=3.10 rdkit -c conda-forge
-          conda activate testenv
-          pip install --upgrade pip
-          pip install twine
-
-      # Step 4: Publish distribution to TestPyPI using official action
+      # Step 2: The TestPyPI publish step doesn't need additional setup
+      # since it only uses the official publish action
+      # Step 3: Publish distribution to TestPyPI using official action
       - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

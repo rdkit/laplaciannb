@@ -15,25 +15,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          auto-activate-base: false
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
           python-version: "3.10"
 
-      - name: Cache conda environment
-        uses: actions/cache@v4
-        with:
-          path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-precommit-${{ hashFiles('pyproject.toml', '.pre-commit-config.yaml') }}
-
-      - name: Create environment
+      - name: Install dependencies with uv
         run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n precommitenv python=3.10 rdkit -c conda-forge
-          conda activate precommitenv
-          pip install --upgrade pip
-          pip install -e .[test] pre-commit
+          uv sync --group test --no-dev
 
       - name: Cache pre-commit hooks
         uses: actions/cache@v4
@@ -43,15 +37,11 @@ jobs:
 
       - name: Run pre-commit on all files
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate precommitenv
-          pre-commit run --all-files --show-diff-on-failure
+          uv run pre-commit run --all-files --show-diff-on-failure
 
       - name: Check pre-commit config is up to date
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate precommitenv
-          pre-commit autoupdate --bleeding-edge
+          uv run pre-commit autoupdate --bleeding-edge
 
           # Check if autoupdate changed anything
           if ! git diff --quiet .pre-commit-config.yaml; then

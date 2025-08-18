@@ -55,40 +55,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          auto-activate-base: false
-          python-version: "3.10"
+          version: "latest"
 
-      - name: Cache conda packages
-        uses: actions/cache@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-build-${{ hashFiles('pyproject.toml') }}
+          python-version: "3.10"
 
       - name: Setup build environment
         run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n buildenv python=3.10 rdkit -c conda-forge
-          conda activate buildenv
-          pip install --upgrade pip build twine
+          uv sync --group test --no-dev
+          uv add --dev build twine
 
       - name: Run tests before publishing
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          pip install -e .[test]
-          python -m pytest tests/ -x --tb=short
+          uv run python -m pytest tests/ -x --tb=short
 
       - name: Generate development version
         id: version
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-
           # Get base version
-          BASE_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from laplaciannb import __version__; print(__version__)")
+          BASE_VERSION=$(uv run python -c "import sys; sys.path.insert(0, 'src'); from laplaciannb import __version__; print(__version__)")
           echo "Base version: $BASE_VERSION"
 
           # Generate dev version with short commit hash and timestamp
@@ -103,26 +93,20 @@ jobs:
           sed -i "s/__version__ = \"$BASE_VERSION\"/__version__ = \"$DEV_VERSION\"/" src/laplaciannb/__init__.py
 
           # Verify version was updated
-          UPDATED_VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from laplaciannb import __version__; print(__version__)")
+          UPDATED_VERSION=$(uv run python -c "import sys; sys.path.insert(0, 'src'); from laplaciannb import __version__; print(__version__)")
           echo "Updated version: $UPDATED_VERSION"
 
       - name: Build distribution
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          python -m build
+          uv run python -m build
 
       - name: Validate distribution
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate buildenv
-          twine check dist/*
+          uv run twine check dist/*
 
-          # Test installation in clean environment
-          conda create -y -n testinstall python=3.9
-          conda activate testinstall
-          pip install dist/*.whl
-          python -c "import laplaciannb; print(f'Installed version: {laplaciannb.__version__}')"
+          # Test installation with uv
+          uv run pip install dist/*.whl
+          uv run python -c "import laplaciannb; print(f'Installed version: {laplaciannb.__version__}')"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

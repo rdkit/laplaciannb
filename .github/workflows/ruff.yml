@@ -37,31 +37,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          auto-activate-base: false
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Cache conda environment
-        uses: actions/cache@v4
-        with:
-          path: ~/conda_pkgs_dir
-          key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
-
-      - name: Create test environment
+      - name: Install dependencies with uv
         run: |
-          eval "$(conda shell.bash hook)"
-          conda create -y -n testenv python=${{ matrix.python-version }} rdkit -c conda-forge
-          conda activate testenv
-          pip install --upgrade pip
-          pip install -e .[test]
+          uv sync --group test --no-dev
 
       - name: Run tests with coverage
         run: |
-          eval "$(conda shell.bash hook)"
-          conda activate testenv
-          python -m pytest tests/ --tb=short -x --cov=laplaciannb --cov-report=xml --cov-report=term-missing
+          uv run python -m pytest tests/ --tb=short -x --cov=laplaciannb --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
