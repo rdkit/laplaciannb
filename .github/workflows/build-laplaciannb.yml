@@ -72,12 +72,8 @@ jobs:
     defaults:
       run:
         shell: bash
-    environment:
-      name: pypi
-      url: https://pypi.org/project/laplaciannb/
     permissions:
       contents: read
-      id-token: write # For trusted publishing
     steps:
       # Step 1: Download the distribution artifacts
       - name: Download all the dists
@@ -93,6 +89,7 @@ jobs:
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
           verbose: true
 
   publish-to-testpypi:
@@ -103,12 +100,8 @@ jobs:
     defaults:
       run:
         shell: bash
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/project/laplaciannb/
     permissions:
       contents: read
-      id-token: write # For trusted publishing
     steps:
       # Step 1: Download the distribution artifacts
       - name: Download all the dists
@@ -123,6 +116,7 @@ jobs:
       - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
           verbose: true
 

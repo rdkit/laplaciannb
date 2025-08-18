@@ -44,12 +44,8 @@ jobs:
     defaults:
       run:
         shell: bash
-    environment:
-      name: pypi-dev
-      url: https://pypi.org/project/laplaciannb/
     permissions:
       contents: read
-      id-token: write # For trusted publishing
 
     steps:
       - name: Checkout repository
@@ -111,6 +107,7 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
           verbose: true
           print-hash: true
 
