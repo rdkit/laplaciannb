@@ -2,15 +2,15 @@ name: Test Coverage
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   coverage:
     name: Test Coverage Report
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-activate-base: false
-          python-version: '3.9'
+          python-version: "3.10"
 
       - name: Cache conda environment
         uses: actions/cache@v4
@@ -30,7 +30,7 @@ jobs:
       - name: Create test environment
         run: |
           eval "$(conda shell.bash hook)"
-          conda create -y -n testenv python=3.9 rdkit -c conda-forge
+          conda create -y -n testenv python=3.10 rdkit -c conda-forge
           conda activate testenv
           pip install --upgrade pip
           pip install -e .[test] coverage[toml] pytest-cov

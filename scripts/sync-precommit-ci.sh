@@ -16,19 +16,19 @@ if git diff --quiet .pre-commit-config.yaml; then
 else
     echo "📝 Pre-commit hooks updated:"
     git diff .pre-commit-config.yaml
-    
+
     echo ""
     echo "🔍 Checking for version mismatches with CI..."
-    
+
     # Extract ruff version from pre-commit
     PRECOMMIT_RUFF=$(grep -A1 "astral-sh/ruff-pre-commit" .pre-commit-config.yaml | grep "rev:" | sed 's/.*rev: v*//' | tr -d ' ')
     echo "Pre-commit ruff version: v$PRECOMMIT_RUFF"
-    
+
     # Check GitHub Actions for ruff version
     if grep -r "astral-sh/ruff-action" .github/workflows/; then
         echo "Found ruff in GitHub Actions workflows"
     fi
-    
+
     echo ""
     echo "💡 Remember to:"
     echo "  1. Review the changes in .pre-commit-config.yaml"

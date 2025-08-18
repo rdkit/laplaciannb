@@ -10,7 +10,7 @@ jobs:
   pre-commit:
     name: Run pre-commit hooks
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-activate-base: false
-          python-version: '3.9'
+          python-version: "3.10"
 
       - name: Cache conda environment
         uses: actions/cache@v4
@@ -30,7 +30,7 @@ jobs:
       - name: Create environment
         run: |
           eval "$(conda shell.bash hook)"
-          conda create -y -n precommitenv python=3.9 rdkit -c conda-forge
+          conda create -y -n precommitenv python=3.10 rdkit -c conda-forge
           conda activate precommitenv
           pip install --upgrade pip
           pip install -e .[test] pre-commit
@@ -52,7 +52,7 @@ jobs:
           eval "$(conda shell.bash hook)"
           conda activate precommitenv
           pre-commit autoupdate --bleeding-edge
-          
+
           # Check if autoupdate changed anything
           if ! git diff --quiet .pre-commit-config.yaml; then
             echo "::warning title=Pre-commit config outdated::Pre-commit hooks can be updated. Run 'pre-commit autoupdate' locally."
@@ -64,7 +64,7 @@ jobs:
   verify-sync:
     name: Verify CI and pre-commit sync
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -74,10 +74,10 @@ jobs:
           # Extract ruff version from pre-commit config
           PRECOMMIT_RUFF=$(grep -A1 "astral-sh/ruff-pre-commit" .pre-commit-config.yaml | grep "rev:" | sed 's/.*rev: v*//' | tr -d ' ')
           echo "Pre-commit ruff version: $PRECOMMIT_RUFF"
-          
+
           # Check if GitHub Actions use consistent versions
           echo "✅ Versions synchronized between pre-commit and GitHub Actions"
-          
+
           # Check that the same files are being checked
           echo "📁 File patterns:"
           echo "  - Pre-commit focuses on src/ directory"

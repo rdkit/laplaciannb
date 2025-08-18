@@ -26,7 +26,7 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-activate-base: false
-          python-version: "3.9"
+          python-version: "3.10"
 
       - name: Cache conda packages
         uses: actions/cache@v4
@@ -38,7 +38,7 @@ jobs:
       - name: Create & activate Build Env
         run: |
           eval "$(conda shell.bash hook)"
-          conda create -y -n buildenv python=3.9 rdkit -c conda-forge
+          conda create -y -n buildenv python=3.10 rdkit -c conda-forge
           conda activate buildenv
 
       # Step 4: Install build tools
@@ -109,7 +109,7 @@ jobs:
       - name: Create & activate PyPi Env
         run: |
           eval "$(conda shell.bash hook)"
-          conda create -y -n pypienv python=3.9 rdkit -c conda-forge
+          conda create -y -n pypienv python=3.10 rdkit -c conda-forge
           conda activate pypienv
           pip install --upgrade pip
           pip install twine
@@ -152,7 +152,7 @@ jobs:
       - name: Create & activate Test Env
         run: |
           eval "$(conda shell.bash hook)"
-          conda create -y -n testenv python=3.9 rdkit -c conda-forge
+          conda create -y -n testenv python=3.10 rdkit -c conda-forge
           conda activate testenv
           pip install --upgrade pip
           pip install twine
