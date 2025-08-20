@@ -106,7 +106,7 @@ class LaplacianNB(_BaseDiscreteNB):
         self.alpha = alpha
         self.fit_prior = fit_prior
         self.class_prior = class_prior
-        force_alpha = force_alpha
+        self.force_alpha = force_alpha
 
     def _check_X(self, X):
         """Validate X, used only in predict* methods."""
