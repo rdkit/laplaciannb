@@ -17,8 +17,8 @@ The modern implementation offers:
 - Enhanced fingerprint utility functions
 """
 
+from .bayes import LaplacianNB
 from .fingerprint_utils import rdkit_to_csr
-from .laplaciannb import LaplacianNB
 
 
 __version__ = "0.7.0"

@@ -1,6 +1,4 @@
-import warnings
 from functools import reduce
-from itertools import compress
 
 import numpy as np
 from scipy.special import logsumexp
@@ -131,40 +129,40 @@ class LaplacianNB(_BaseDiscreteNB):
     def _count_feature_count(self, X_sparse, Y):
         """Most efficient version that handles 2^32 feature space gracefully."""
         from collections import defaultdict
-        
+
         # Get active features to avoid working with full 2^32 space
         X_coo = X_sparse.tocoo()
-        
+
         # 1. Total feature counts
         all_feature_counts = defaultdict(int)
         for col_idx, data_val in zip(X_coo.col, X_coo.data):
             all_feature_counts[col_idx] += data_val
         all_feature_counts = dict(sorted(all_feature_counts.items()))
-        
+
         # 2. Class-specific counts by iterating samples
         class_feature_counts = [defaultdict(int) for _ in range(len(self.classes_))]
         feature_sum = np.zeros(len(self.classes_))
-        
+
         # Group elements by sample (row)
         sample_features = defaultdict(list)
         for row_idx, col_idx, data_val in zip(X_coo.row, X_coo.col, X_coo.data):
             sample_features[row_idx].append((col_idx, data_val))
-        
+
         # Count features per class
         for sample_idx, features in sample_features.items():
             # Find which classes this sample belongs to
             sample_classes = Y[sample_idx].nonzero()[0]
-            
+
             for class_idx in sample_classes:
                 class_weight = Y[sample_idx, class_idx]
                 for col_idx, data_val in features:
                     weighted_count = data_val * class_weight
                     class_feature_counts[class_idx][col_idx] += weighted_count
                     feature_sum[class_idx] += weighted_count
-        
+
         # Convert to sorted dictionaries
         class_feature_counts = [dict(sorted(d.items())) for d in class_feature_counts]
-        
+
         return all_feature_counts, feature_sum, class_feature_counts
 
     def _init_counters(self, n_classes):
