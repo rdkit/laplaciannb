@@ -105,31 +105,6 @@ class LaplacianNB(_BaseDiscreteNB):
     # see https://github.com/scikit-learn/scikit-learn/pull/22269 for an explanation
 
     def __init__(self, *, alpha=1.0, force_alpha=True, fit_prior=True, class_prior=None):
-        warnings.warn(
-            "\n" + "=" * 80 + "\n"
-            "DEPRECATION WARNING: Legacy LaplacianNB Class\n" + "=" * 80 + "\n"
-            "You are using the DEPRECATED legacy LaplacianNB implementation.\n"
-            "This class will be REMOVED in a future release.\n\n"
-            "PLEASE MIGRATE to the new sklearn-compatible version:\n\n"
-            "  ✅ RECOMMENDED:\n"
-            "    from laplaciannb import LaplacianNB\n"
-            "    from laplaciannb.fingerprint_utils import convert_fingerprints\n"
-            "    \n"
-            "    X = convert_fingerprints(your_fingerprints, n_bits=size)\n"
-            "    clf = LaplacianNB(alpha=1.0)\n"
-            "    clf.fit(X, y)\n\n"
-            "  ❌ DEPRECATED (current usage):\n"
-            "    from laplaciannb.legacy import LaplacianNB\n"
-            "    clf = LaplacianNB(alpha=1.0)  # This class\n\n"
-            "Migration benefits:\n"
-            "• sklearn pipelines, cross-validation, grid search\n"
-            "• Memory-efficient sparse matrix support\n"
-            "• Better performance and error handling\n"
-            "• Future-proof implementation\n\n"
-            "See MIGRATION_GUIDE.md for step-by-step instructions.\n" + "=" * 80,
-            DeprecationWarning,
-            stacklevel=2,
-        )
         self.alpha = alpha
         self.fit_prior = fit_prior
         self.class_prior = class_prior
