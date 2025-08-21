@@ -7,16 +7,20 @@ A minimal example showing basic LaplacianNB usage with molecular data.
 """
 
 import numpy as np
+from rdkit import Chem
+from rdkit.Chem import rdFingerprintGenerator
+
 from laplaciannb import LaplacianNB
 from laplaciannb.fingerprint_utils import rdkit_to_csr
 
+
 # Sample molecular data
 smiles = [
-    "CCO",                              # Ethanol - inactive
-    "CC(=O)OC1=CC=CC=C1C(=O)O",        # Aspirin - active
-    "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",   # Ibuprofen - active
-    "CCCCCCCCCCCCCCCC",                 # Palmitic acid - inactive
-    "CC1=CC=C(C=C1)C(=O)O"             # p-Toluic acid - active
+    "CCO",  # Ethanol - inactive
+    "CC(=O)OC1=CC=CC=C1C(=O)O",  # Aspirin - active
+    "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",  # Ibuprofen - active
+    "CCCCCCCCCCCCCCCC",  # Palmitic acid - inactive
+    "CC1=CC=C(C=C1)C(=O)O",  # p-Toluic acid - active
 ]
 y = [0, 1, 1, 0, 1]  # Activity labels (0=inactive, 1=active)
 
@@ -38,9 +42,7 @@ probabilities = clf.predict_proba(X)
 # Display results
 print("\nResults:")
 print("-" * 40)
-for i, (smiles_str, true_label, pred_label, prob) in enumerate(
-    zip(smiles, y, predictions, probabilities)
-):
+for i, (smiles_str, true_label, pred_label, prob) in enumerate(zip(smiles, y, predictions, probabilities)):
     print(f"Molecule {i+1}: {smiles_str[:20]}")
     print(f"  True: {true_label}, Predicted: {pred_label}")
     print(f"  Probabilities: [Inactive: {prob[0]:.3f}, Active: {prob[1]:.3f}]")
@@ -58,8 +60,6 @@ print("=" * 50)
 print("\nOriginal RDKit fingerprint indices for each molecule:")
 print("-" * 50)
 
-from rdkit import Chem
-from rdkit.Chem import rdFingerprintGenerator
 
 # Recreate the fingerprint generator to get individual fingerprints
 mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2)
@@ -80,7 +80,7 @@ for i, smiles_str in enumerate(smiles):
         print(f"  Total fingerprint bits: {len(original_indices)}")
 
 # Show how to extract indices from the sparse matrix
-print(f"\nExtracting indices from sparse matrix:")
+print("\nExtracting indices from sparse matrix:")
 print("-" * 50)
 
 for i in range(X.shape[0]):
@@ -92,8 +92,8 @@ for i in range(X.shape[0]):
     print(f"Molecule {i+1} active bits: {row_indices[:10]}{'...' if len(row_indices) > 10 else ''}")
     print(f"  Total: {len(row_indices)} active bits")
 
-print(f"\n✓ You can now map back to original RDKit fingerprint indices")
-print(f"✓ Useful for feature interpretation and chemical insights")
+print("\n✓ You can now map back to original RDKit fingerprint indices")
+print("✓ Useful for feature interpretation and chemical insights")
 
 # Reverse mapping: From sparse matrix back to RDKit
 print("\n" + "=" * 50)
@@ -103,6 +103,7 @@ print("=" * 50)
 print("\nMapping sparse matrix indices back to original RDKit bits:")
 print("-" * 50)
 
+
 def uint32_to_rdkit_index(uint32_index):
     """Convert uint32 matrix index back to original RDKit signed int32."""
     # Convert back from unsigned to signed int32
@@ -110,6 +111,7 @@ def uint32_to_rdkit_index(uint32_index):
         return int(uint32_index) - 2**32
     else:
         return int(uint32_index)
+
 
 # Example: Take the first molecule and show the reverse mapping
 mol_idx = 0
@@ -129,7 +131,7 @@ print(f"RDKit indices (int32):   {rdkit_indices}")
 # Verify this matches the original fingerprint
 mol = Chem.MolFromSmiles(smiles[mol_idx])
 sfp = mfpgen.GetSparseFingerprint(mol)
-original_indices = sorted(list(sfp.GetOnBits()))
+original_indices = sorted(sfp.GetOnBits())
 recovered_indices = sorted(rdkit_indices)
 
 print(f"Original RDKit indices: {original_indices}")

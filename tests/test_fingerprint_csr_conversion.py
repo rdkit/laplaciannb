@@ -1,8 +1,6 @@
-import pytest
 import numpy as np
-from scipy.sparse import csr_matrix
 from rdkit import Chem
-from rdkit.Chem import AllChem
+
 from laplaciannb.fingerprint_utils import rdkit_to_csr
 
 
@@ -18,7 +16,6 @@ def get_test_molecules():
 
 
 class TestFingerprintCSRConversion:
-
     def test_rdkit_to_csr_basic(self):
         """Test basic RDKit to CSR conversion"""
         smiles = ["CCO", "CC", "CCC"]
@@ -37,6 +34,7 @@ class TestFingerprintCSRConversion:
         # Calculate total expected fingerprint bits across all molecules
         # Use the same API as the function
         from rdkit.Chem import rdFingerprintGenerator
+
         mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2)
 
         total_expected_bits = 0

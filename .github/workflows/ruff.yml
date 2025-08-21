@@ -18,13 +18,11 @@ jobs:
         uses: astral-sh/ruff-action@v1
         with:
           args: "check --output-format=github --exit-non-zero-on-fix"
-          src: "./src"
 
       - name: Run Ruff formatting check
         uses: astral-sh/ruff-action@v1
         with:
           args: "format --check"
-          src: "./src"
 
   tests:
     name: Run Tests

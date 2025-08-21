@@ -51,15 +51,15 @@ def test_lmnb_prior_unobserved_targets():
 
 
 def test_rdkit():
-    from laplaciannb.fingerprint_utils import rdkit_to_csr
     from laplaciannb import LaplacianNB
+    from laplaciannb.fingerprint_utils import rdkit_to_csr
 
     DATA_PATH = Path(__file__).parent.parent.joinpath("tests/data/")
     file = str(DATA_PATH.joinpath("smiles_test.csv"))
     df = pd.read_csv(file)
 
     # Convert to sparse CSR matrix using our fingerprint utility
-    X_sparse = rdkit_to_csr(df['smiles'].values, radius=2)
+    X_sparse = rdkit_to_csr(df["smiles"].values, radius=2)
 
     y = df["activity"]
     clf = LaplacianNB()
@@ -72,16 +72,17 @@ def test_rdkit():
 
 def test_joint_log_likelihood():
     """Test joint log likelihood with CSR matrices."""
-    from laplaciannb.fingerprint_utils import rdkit_to_csr
-    from laplaciannb import LaplacianNB
     from scipy.sparse import csr_matrix
+
+    from laplaciannb import LaplacianNB
+    from laplaciannb.fingerprint_utils import rdkit_to_csr
 
     DATA_PATH = Path(__file__).parent.parent.joinpath("tests/data/")
     file = str(DATA_PATH.joinpath("smiles_test.csv"))
     df = pd.read_csv(file)
 
     # Convert to CSR matrix using fingerprint utility
-    X = rdkit_to_csr(df['smiles'].values, radius=2)
+    X = rdkit_to_csr(df["smiles"].values, radius=2)
     y = df["activity"]
     clf = LaplacianNB()
     clf.fit(X, y)
@@ -91,7 +92,7 @@ def test_joint_log_likelihood():
     test_row = [0]
     test_col = [2**30]  # Use a large but valid index within 2^32-1 limit
     test_data = [1]
-    new_X = csr_matrix((test_data, (test_row, test_col)), shape=(1, 2**32-1), dtype=np.bool_)
+    new_X = csr_matrix((test_data, (test_row, test_col)), shape=(1, 2**32 - 1), dtype=np.bool_)
 
     try:
         clf._joint_log_likelihood(new_X)
@@ -123,7 +124,7 @@ def test_csr_fingerprint_conversion():
         fingerprint_rows.append(fingerprint_set)
 
     # Verify that molecules have some different features
-    assert len(set(len(fp) for fp in fingerprint_rows)) > 1  # Different numbers of features
+    assert len({len(fp) for fp in fingerprint_rows}) > 1  # Different numbers of features
 
     print(f"Successfully created CSR matrix: {X_sparse.shape}, nnz: {X_sparse.nnz}")
     print(f"Fingerprint sizes: {[len(fp) for fp in fingerprint_rows]}")

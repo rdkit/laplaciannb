@@ -7,13 +7,15 @@ Test the performance and scalability of LaplacianNB fingerprint conversion
 with datasets up to 100,000 molecules.
 """
 
-import sys
 import os
+import sys
+
 
 # Add src to path so we can import laplaciannb
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from laplaciannb.fingerprint_utils import benchmark_large_scale_conversion
+
 
 def main():
     """Run large-scale fingerprint conversion benchmark."""
@@ -32,16 +34,16 @@ def main():
             target_molecules=100000,
             test_sizes=[1000, 5000, 10000, 25000, 50000, 100000],
             radius=2,
-            sample_diversity=True
+            sample_diversity=True,
         )
 
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("BENCHMARK SUMMARY")
-        print("="*50)
+        print("=" * 50)
 
         if results:
-            fastest_rate = max(r['rate'] for r in results)
-            largest_test = max(results, key=lambda x: x['molecules'])
+            fastest_rate = max(r["rate"] for r in results)
+            largest_test = max(results, key=lambda x: x["molecules"])
 
             print(f"Peak conversion rate: {fastest_rate:,.0f} molecules/second")
             print(f"Largest test completed: {largest_test['molecules']:,} molecules")
@@ -50,17 +52,17 @@ def main():
             print(f"Sparsity achieved: {largest_test['sparsity']:.6f}")
 
             # Calculate efficiency metrics
-            total_molecules = sum(r['molecules'] for r in results)
-            total_time = sum(r['time'] for r in results)
+            total_molecules = sum(r["molecules"] for r in results)
+            total_time = sum(r["time"] for r in results)
             overall_rate = total_molecules / total_time
 
-            print(f"\nOverall benchmark performance:")
+            print("\nOverall benchmark performance:")
             print(f"  Total molecules processed: {total_molecules:,}")
             print(f"  Total time: {total_time:.1f} seconds")
             print(f"  Average rate: {overall_rate:,.0f} molecules/second")
 
-        print(f"\n✓ Large-scale benchmark completed successfully!")
-        print(f"✓ LaplacianNB fingerprint conversion scales efficiently to 100K+ molecules")
+        print("\n✓ Large-scale benchmark completed successfully!")
+        print("✓ LaplacianNB fingerprint conversion scales efficiently to 100K+ molecules")
 
     except ImportError as e:
         print(f"Missing dependency: {e}")
@@ -68,7 +70,9 @@ def main():
     except Exception as e:
         print(f"Error during benchmark: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
