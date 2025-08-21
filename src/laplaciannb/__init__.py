@@ -21,7 +21,7 @@ from .bayes import LaplacianNB
 from .fingerprint_utils import rdkit_to_csr
 
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 __all__ = [
     "LaplacianNB",
     "rdkit_to_csr",
