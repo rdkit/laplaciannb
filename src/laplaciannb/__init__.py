@@ -17,28 +17,12 @@ The modern implementation offers:
 - Enhanced fingerprint utility functions
 """
 
-from .fingerprint_utils import (
-    FingerprintTransformer,
-    RDKitFingerprintConverter,
-    convert_fingerprints,
-    rdkit_sparse_to_csc,
-    rdkit_sparse_to_csr,
-    rdkit_sparse_to_dense,
-    rdkit_sparse_to_numpy,
-    rdkit_sparse_to_sklearn,
-)
-from .LaplacianNB import LaplacianNB
+from .bayes import LaplacianNB
+from .fingerprint_utils import rdkit_to_csr
 
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 __all__ = [
     "LaplacianNB",
-    "FingerprintTransformer",
-    "RDKitFingerprintConverter",
-    "convert_fingerprints",
-    "rdkit_sparse_to_dense",
-    "rdkit_sparse_to_csr",
-    "rdkit_sparse_to_csc",
-    "rdkit_sparse_to_numpy",
-    "rdkit_sparse_to_sklearn",
+    "rdkit_to_csr",
 ]

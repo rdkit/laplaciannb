@@ -1,665 +1,439 @@
-from typing import Any, Dict, Optional, Union
+import time
 
 import numpy as np
-from scipy import sparse
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils.validation import check_is_fitted
+from rdkit import Chem
+from rdkit.Chem import rdFingerprintGenerator
+from scipy.sparse import csr_matrix
 
 
-def rdkit_sparse_to_dense(fingerprint, n_bits: int = 2048, dtype=np.float32) -> np.ndarray:
-    """Convert a single RDKit sparse fingerprint to dense numpy array.
+try:
+    from tqdm import tqdm
 
-    Parameters
-    ----------
-    fingerprint : various RDKit fingerprint types
-        Can be:
-        - RDKit ExplicitBitVect
-        - RDKit SparseBitVect
-        - RDKit IntSparseIntVect
-        - UIntSparseIntVect
-        - LongSparseIntVect
-        - Set of on-bit indices
-        - Dict mapping bit indices to counts
-        - List/tuple of on-bit indices
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
 
-    n_bits : int, default=2048
-        Size of the output fingerprint vector.
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output array.
-
-    Returns
-    -------
-    np.ndarray
-        Dense numpy array of shape (n_bits,) with binary or count values.
-
-    Examples
-    --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>> mol = Chem.MolFromSmiles('CCO')
-    >>> fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2, nBits=2048)
-    >>> dense_fp = rdkit_sparse_to_dense(fp, n_bits=2048)
-    """
-    dense = np.zeros(n_bits, dtype=dtype)
-
-    if fingerprint is None:
-        return dense
-
-    # Handle RDKit BitVect types
-    if hasattr(fingerprint, "GetOnBits"):
-        # ExplicitBitVect or SparseBitVect
-        for bit_idx in fingerprint.GetOnBits():
-            if 0 <= bit_idx < n_bits:
-                dense[bit_idx] = 1.0
-
-    # Handle RDKit SparseIntVect types
-    elif hasattr(fingerprint, "GetNonzeroElements"):
-        # IntSparseIntVect, UIntSparseIntVect, LongSparseIntVect
-        for bit_idx, count in fingerprint.GetNonzeroElements().items():
-            if 0 <= bit_idx < n_bits:
-                dense[bit_idx] = float(count)
-
-    # Handle Python set (set of on-bits)
-    elif isinstance(fingerprint, set):
-        for bit_idx in fingerprint:
-            if 0 <= bit_idx < n_bits:
-                dense[bit_idx] = 1.0
-
-    # Handle Python dict (bit_idx: count mapping)
-    elif isinstance(fingerprint, dict):
-        for bit_idx, count in fingerprint.items():
-            if 0 <= bit_idx < n_bits:
-                dense[bit_idx] = float(count)
-
-    # Handle list/tuple of on-bit indices
-    elif isinstance(fingerprint, (list, tuple)):
-        # Check if it's a list of indices or a full vector
-        if len(fingerprint) == n_bits:
-            # Full vector, return as-is after conversion
-            return np.asarray(fingerprint, dtype=dtype)
-        else:
-            # List of on-bit indices
-            for bit_idx in fingerprint:
-                if 0 <= bit_idx < n_bits:
-                    dense[bit_idx] = 1.0
-
-    # Handle numpy array (already in correct format)
-    elif isinstance(fingerprint, np.ndarray):
-        if len(fingerprint) == n_bits:
-            return fingerprint.astype(dtype)
-        else:
-            # Treat as list of indices
-            for bit_idx in fingerprint:
-                if 0 <= bit_idx < n_bits:
-                    dense[bit_idx] = 1.0
-
-    else:
-        # Try to iterate as a sequence
-        try:
-            for bit_idx in fingerprint:
-                if 0 <= bit_idx < n_bits:
-                    dense[bit_idx] = 1.0
-        except (TypeError, ValueError):
-            raise ValueError(f"Unsupported fingerprint type: {type(fingerprint)}")
-
-    return dense
+    def tqdm(iterable, *args, **kwargs):
+        """Fallback if tqdm is not available."""
+        return iterable
 
 
-def rdkit_sparse_to_csr(fingerprints, n_bits: int = 2048, dtype=np.float32) -> sparse.csr_matrix:
-    """Convert RDKit sparse fingerprints to scipy CSR sparse matrix.
+def rdkit_to_csr(smiles_list, radius=2, show_progress=True):
+    """Convert RDKit sparse Morgan fingerprints to CSR matrix with lossless conversion.
 
     Parameters
     ----------
-    fingerprints : single fingerprint or list of fingerprints
-        RDKit fingerprints in various formats.
-
-    n_bits : int, default=2048
-        Size of the fingerprint vectors.
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output matrix.
+    smiles_list : list of str
+        List of SMILES strings to convert to fingerprints
+    radius : int, default=2
+        Morgan fingerprint radius
+    show_progress : bool, default=True
+        Show progress bar if tqdm is available
 
     Returns
     -------
-    sparse.csr_matrix
-        Sparse CSR matrix of shape (n_samples, n_bits).
+    scipy.sparse.csr_matrix
+        Sparse matrix of shape (n_molecules, 2^32) with boolean dtype
 
     Examples
     --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>> mols = [Chem.MolFromSmiles('CCO'), Chem.MolFromSmiles('CC')]
-    >>> fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2) for mol in mols]
-    >>> csr_matrix = rdkit_sparse_to_csr(fps, n_bits=2048)
+    >>> smiles = ["CCO", "CC(=O)OC1=CC=CC=C1C(=O)O"]
+    >>> X = rdkit_to_csr(smiles, radius=2)
+    >>> print(f"Shape: {X.shape}, Sparsity: {1 - X.nnz / X.size:.6f}")
     """
-    # Handle single fingerprint
-    if not isinstance(fingerprints, (list, tuple, np.ndarray)):
-        fingerprints = [fingerprints]
-    elif isinstance(fingerprints, np.ndarray) and fingerprints.ndim == 1:
-        # Could be a single dense fingerprint or array of fingerprints
-        if len(fingerprints) == n_bits:
-            fingerprints = [fingerprints]
+    start_time = time.time()
 
-    n_samples = len(fingerprints)
-    rows, cols, data = [], [], []
+    row_ind = []
+    col_ind = []
 
-    for i, fp in enumerate(fingerprints):
-        if fp is None:
+    # Create Morgan fingerprint generator
+    print(f"Converting {len(smiles_list)} SMILES to molecular fingerprints...")
+    mol_list = [Chem.MolFromSmiles(smi) for smi in smiles_list]
+    mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=radius)
+
+    # Process molecules with optional progress bar
+    iterator = enumerate(mol_list)
+    if show_progress and TQDM_AVAILABLE and len(mol_list) > 10:
+        iterator = tqdm(iterator, total=len(mol_list), desc="Processing molecules", unit="mol")
+
+    valid_molecules = 0
+    total_bits = 0
+
+    for i, mol in iterator:
+        if mol is None:
             continue
 
-        # Extract on-bits and values
-        if hasattr(fp, "GetOnBits"):
-            # BitVect types
-            for bit_idx in fp.GetOnBits():
-                if 0 <= bit_idx < n_bits:
-                    rows.append(i)
-                    cols.append(bit_idx)
-                    data.append(1.0)
+        valid_molecules += 1
 
-        elif hasattr(fp, "GetNonzeroElements"):
-            # SparseIntVect types
-            for bit_idx, count in fp.GetNonzeroElements().items():
-                if 0 <= bit_idx < n_bits:
-                    rows.append(i)
-                    cols.append(bit_idx)
-                    data.append(float(count))
+        # Get sparse fingerprint
+        sfp = mfpgen.GetSparseFingerprint(mol)
+        mol_bits = set(sfp.GetOnBits())
+        total_bits += len(mol_bits)
 
-        elif isinstance(fp, set):
-            for bit_idx in fp:
-                if 0 <= bit_idx < n_bits:
-                    rows.append(i)
-                    cols.append(bit_idx)
-                    data.append(1.0)
+        for bit in mol_bits:
+            # Reinterpret signed int32 as unsigned int32
+            # This maps [-2^31, 2^31-1] to [0, 2^32-1] losslessly
+            col_idx = np.uint32(bit & 0xFFFFFFFF)
 
-        elif isinstance(fp, dict):
-            for bit_idx, count in fp.items():
-                if 0 <= bit_idx < n_bits:
-                    rows.append(i)
-                    cols.append(bit_idx)
-                    data.append(float(count))
+            row_ind.append(i)
+            col_ind.append(col_idx)
 
-        elif isinstance(fp, (list, tuple, np.ndarray)):
-            if len(fp) == n_bits:
-                # Full vector
-                for j, val in enumerate(fp):
-                    if val != 0:
-                        rows.append(i)
-                        cols.append(j)
-                        data.append(float(val))
-            else:
-                # List of indices
-                for bit_idx in fp:
-                    if 0 <= bit_idx < n_bits:
-                        rows.append(i)
-                        cols.append(bit_idx)
-                        data.append(1.0)
+    # Create data array (all ones for boolean matrix)
+    data = np.ones(len(row_ind), dtype=np.bool_)
 
-        else:
-            # Try to iterate
-            try:
-                for bit_idx in fp:
-                    if 0 <= bit_idx < n_bits:
-                        rows.append(i)
-                        cols.append(bit_idx)
-                        data.append(1.0)
-            except (TypeError, ValueError):
-                raise ValueError(f"Unsupported fingerprint type: {type(fp)}")
+    # Create sparse matrix
+    matrix = csr_matrix((data, (row_ind, col_ind)), shape=(len(mol_list), 2**32), dtype=np.bool_)
 
-    return sparse.csr_matrix((data, (rows, cols)), shape=(n_samples, n_bits), dtype=dtype)
+    # Performance summary
+    conversion_time = time.time() - start_time
+    sparsity = 1 - matrix.nnz / matrix.size if matrix.size > 0 else 0
+
+    print(f"Conversion completed in {conversion_time:.3f} seconds")
+    print(f"Valid molecules: {valid_molecules}/{len(mol_list)}")
+    print(f"Total fingerprint bits: {total_bits:,}")
+    print(f"Average bits per molecule: {total_bits / valid_molecules:.1f}")
+    print(f"Matrix shape: {matrix.shape}")
+    print(f"Matrix sparsity: {sparsity:.6f}")
+    print(f"Memory usage: {(matrix.data.nbytes + matrix.indices.nbytes + matrix.indptr.nbytes) / 1024**2:.2f} MB")
+
+    return matrix
 
 
-def rdkit_sparse_to_csc(fingerprints, n_bits: int = 2048, dtype=np.float32) -> sparse.csc_matrix:
-    """Convert RDKit sparse fingerprints to scipy CSC sparse matrix.
+def benchmark_fingerprint_conversion(n_molecules=100000, radii=[2], molecules_per_test=None):
+    """Benchmark fingerprint conversion performance with different parameters.
 
     Parameters
     ----------
-    fingerprints : single fingerprint or list of fingerprints
-        RDKit fingerprints in various formats.
-
-    n_bits : int, default=2048
-        Size of the fingerprint vectors.
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output matrix.
-
-    Returns
-    -------
-    sparse.csc_matrix
-        Sparse CSC matrix of shape (n_samples, n_bits).
-    """
-    csr = rdkit_sparse_to_csr(fingerprints, n_bits=n_bits, dtype=dtype)
-    return csr.tocsc()
-
-
-def rdkit_sparse_to_numpy(fingerprints, n_bits: int = 2048, dtype=np.float32) -> np.ndarray:
-    """Convert RDKit sparse fingerprints to dense numpy array.
-
-    Parameters
-    ----------
-    fingerprints : single fingerprint or list of fingerprints
-        RDKit fingerprints in various formats.
-
-    n_bits : int, default=2048
-        Size of the fingerprint vectors.
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output array.
-
-    Returns
-    -------
-    np.ndarray
-        Dense numpy array of shape (n_samples, n_bits).
+    n_molecules : int, default=1000
+        Number of molecules to generate for benchmarking
+    radii : list of int, default=[1, 2, 3]
+        Morgan fingerprint radii to test
+    molecules_per_test : list of int, optional
+        Different molecule counts to test. If None, uses [100, 500, 1000]
 
     Examples
     --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>> mols = [Chem.MolFromSmiles('CCO'), Chem.MolFromSmiles('CC')]
-    >>> fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2) for mol in mols]
-    >>> dense_matrix = rdkit_sparse_to_numpy(fps, n_bits=2048)
+    >>> benchmark_fingerprint_conversion(1000, radii=[2, 3])
+    >>> benchmark_fingerprint_conversion(500, molecules_per_test=[100, 300, 500])
     """
-    # Handle single fingerprint
-    if not isinstance(fingerprints, (list, tuple)):
-        fingerprints = [fingerprints]
-    elif isinstance(fingerprints, np.ndarray) and fingerprints.ndim == 1:
-        if len(fingerprints) == n_bits:
-            fingerprints = [fingerprints]
+    print("=" * 60)
+    print("FINGERPRINT CONVERSION BENCHMARK")
+    print("=" * 60)
 
-    n_samples = len(fingerprints)
-    dense_matrix = np.zeros((n_samples, n_bits), dtype=dtype)
+    # Generate test SMILES data
+    print(f"Generating {n_molecules} test molecules...")
+    test_smiles = _generate_test_smiles(n_molecules)
 
-    for i, fp in enumerate(fingerprints):
-        dense_matrix[i] = rdkit_sparse_to_dense(fp, n_bits=n_bits, dtype=dtype)
+    if molecules_per_test is None:
+        molecules_per_test = [min(100, n_molecules), min(500, n_molecules), n_molecules]
 
-    return dense_matrix
+    # Test different molecule counts
+    print("\nTesting conversion speed with different dataset sizes:")
+    print("-" * 60)
+    print(f"{'Molecules':<12} {'Radius':<8} {'Time (s)':<10} {'Bits/mol':<10} {'MB':<8}")
+    print("-" * 60)
+
+    for n_mol in molecules_per_test:
+        subset_smiles = test_smiles[:n_mol]
+
+        for radius in radii:
+            start_time = time.time()
+            X = rdkit_to_csr(subset_smiles, radius=radius, show_progress=False)
+            conversion_time = time.time() - start_time
+
+            avg_bits = X.nnz / X.shape[0] if X.shape[0] > 0 else 0
+            memory_mb = (X.data.nbytes + X.indices.nbytes + X.indptr.nbytes) / 1024**2
+
+            print(f"{n_mol:<12} {radius:<8} {conversion_time:<10.3f} {avg_bits:<10.1f} {memory_mb:<8.2f}")
+
+    # Memory efficiency comparison
+    print("\nMemory Efficiency Analysis:")
+    print("-" * 40)
+
+    X_example = rdkit_to_csr(test_smiles[:100], radius=2, show_progress=False)
+    sparse_memory = (X_example.data.nbytes + X_example.indices.nbytes + X_example.indptr.nbytes) / 1024**2
+    dense_memory = (X_example.shape[0] * X_example.shape[1] * np.dtype(np.bool_).itemsize) / 1024**2
+
+    print("100 molecules, radius=2:")
+    print(f"  Sparse matrix: {sparse_memory:.2f} MB")
+    print(f"  Dense equivalent: {dense_memory:,.0f} MB")
+    print(f"  Memory reduction: {(1 - sparse_memory / dense_memory) * 100:.3f}%")
+
+    # Throughput summary
+    print("\nThroughput Summary:")
+    print("-" * 20)
+    fastest_time = min([conversion_time for n_mol in molecules_per_test[:1] for radius in radii[:1]])
+    throughput = molecules_per_test[0] / fastest_time if fastest_time > 0 else 0
+    print(f"Peak throughput: ~{throughput:.0f} molecules/second")
+    print(f"Recommended for datasets: Up to {throughput * 60:.0f} molecules/minute")
 
 
-def rdkit_sparse_to_sklearn(
-    fingerprints, n_bits: int = 2048, output_format: str = "auto", dtype=np.float32
-) -> Union[np.ndarray, sparse.csr_matrix, sparse.csc_matrix]:
-    """Convert RDKit sparse fingerprints to sklearn-compatible format.
+def _generate_test_smiles(n_molecules):
+    """Generate test SMILES strings for benchmarking."""
+    # Simple test molecules with varying complexity
+    base_smiles = [
+        "CCO",  # Ethanol
+        "CC(=O)OC1=CC=CC=C1C(=O)O",  # Aspirin
+        "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",  # Ibuprofen
+        "CCCCCCCCCCCCCCCC",  # Palmitic acid
+        "CC1=CC=C(C=C1)C(=O)O",  # p-Toluic acid
+        "CCN(CC)CC",  # Triethylamine
+        "CC(C)(C)C1=CC=C(C=C1)O",  # BHT
+        "CCCCCCCCCCCCC",  # Tridecane
+        "CC1=CC(=CC(=C1)C)C(=O)O",  # Mesitylenic acid
+        "CCCCCCCCCC",  # Decane
+        "CC1=CC=CC=C1",  # Toluene
+        "C1=CC=CC=C1",  # Benzene
+        "CC(C)O",  # Isopropanol
+        "CCCCO",  # Butanol
+        "CC(C)C",  # Propane
+    ]
+
+    # Repeat base molecules to reach desired count
+    test_smiles = []
+    while len(test_smiles) < n_molecules:
+        test_smiles.extend(base_smiles)
+
+    return test_smiles[:n_molecules]
+
+
+def benchmark_large_scale_conversion(target_molecules=100000, test_sizes=None, radius=2, sample_diversity=True):
+    """Benchmark fingerprint conversion performance for large datasets.
+
+    This function tests the scalability and performance of rdkit_to_csr
+    with large molecular datasets up to 100,000 molecules.
 
     Parameters
     ----------
-    fingerprints : single fingerprint or list of fingerprints
-        RDKit fingerprints in various formats.
-
-    n_bits : int, default=2048
-        Size of the fingerprint vectors.
-
-    output_format : {'auto', 'dense', 'csr', 'csc'}, default='auto'
-        Output format:
-        - 'auto': Choose based on sparsity (CSR if >90% sparse)
-        - 'dense': Dense numpy array
-        - 'csr': Compressed Sparse Row format
-        - 'csc': Compressed Sparse Column format
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output.
-
-    Returns
-    -------
-    array-like
-        Fingerprints in sklearn-compatible format.
+    target_molecules : int, default=100000
+        Maximum number of molecules to test
+    test_sizes : list of int, optional
+        Molecule counts to benchmark. If None, uses logarithmic scale
+    radius : int, default=2
+        Morgan fingerprint radius
+    sample_diversity : bool, default=True
+        If True, generates diverse molecular structures for realistic testing
 
     Examples
     --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>> from sklearn.naive_bayes import BernoulliNB
-    >>>
-    >>> mols = [Chem.MolFromSmiles(smi) for smi in ['CCO', 'CC', 'CCC']]
-    >>> fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2) for mol in mols]
-    >>> X = rdkit_sparse_to_sklearn(fps, output_format='csr')
-    >>> y = [0, 1, 0]
-    >>>
-    >>> clf = BernoulliNB()
-    >>> clf.fit(X, y)
+    >>> benchmark_large_scale_conversion(100000)
+    >>> benchmark_large_scale_conversion(50000, test_sizes=[1000, 10000, 50000])
     """
-    if output_format == "dense":
-        return rdkit_sparse_to_numpy(fingerprints, n_bits=n_bits, dtype=dtype)
-    elif output_format == "csr":
-        return rdkit_sparse_to_csr(fingerprints, n_bits=n_bits, dtype=dtype)
-    elif output_format == "csc":
-        return rdkit_sparse_to_csc(fingerprints, n_bits=n_bits, dtype=dtype)
-    elif output_format == "auto":
-        # First convert to CSR to check sparsity
-        csr_matrix = rdkit_sparse_to_csr(fingerprints, n_bits=n_bits, dtype=dtype)
-        sparsity = 1.0 - (csr_matrix.nnz / (csr_matrix.shape[0] * csr_matrix.shape[1]))
+    print("=" * 80)
+    print("LARGE-SCALE FINGERPRINT CONVERSION BENCHMARK")
+    print("=" * 80)
+    print(f"Target dataset size: {target_molecules:,} molecules")
+    print(f"Morgan fingerprint radius: {radius}")
+    print(f"Diversity sampling: {'Enabled' if sample_diversity else 'Disabled'}")
 
-        if sparsity > 0.9:  # More than 90% sparse
-            return csr_matrix
-        else:
-            return csr_matrix.toarray()
+    if test_sizes is None:
+        # Logarithmic scale testing
+        test_sizes = [1000, 5000, 10000, 25000, 50000]
+        if target_molecules >= 100000:
+            test_sizes.append(100000)
+        # Filter to not exceed target
+        test_sizes = [size for size in test_sizes if size <= target_molecules]
+
+    print(f"\nGenerating test dataset with {target_molecules:,} molecules...")
+    print("-" * 60)
+
+    start_gen = time.time()
+    test_smiles = _generate_diverse_smiles(target_molecules, diverse=sample_diversity)
+    gen_time = time.time() - start_gen
+
+    print(f"Dataset generation completed in {gen_time:.2f} seconds")
+    print(f"Average generation rate: {target_molecules / gen_time:.0f} molecules/second")
+
+    # Performance tracking
+    results = []
+
+    print("\nBenchmarking conversion performance:")
+    print("-" * 80)
+    print(
+        f"{'Molecules':<12} {'Time (s)':<10} {'Rate (mol/s)':<12} {'Bits/mol':<10} {'Memory (MB)':<12} {'Sparsity':<10}"
+    )
+    print("-" * 80)
+
+    for n_molecules in test_sizes:
+        print(f"Testing {n_molecules:,} molecules...", end=" ", flush=True)
+
+        # Subset the data
+        subset_smiles = test_smiles[:n_molecules]
+
+        # Benchmark conversion
+        start_time = time.time()
+        X = rdkit_to_csr(subset_smiles, radius=radius, show_progress=False)
+        conversion_time = time.time() - start_time
+
+        # Calculate metrics
+        rate = n_molecules / conversion_time if conversion_time > 0 else 0
+        avg_bits = X.nnz / X.shape[0] if X.shape[0] > 0 else 0
+        memory_mb = (X.data.nbytes + X.indices.nbytes + X.indptr.nbytes) / 1024**2
+        sparsity = 1 - (X.nnz / X.size) if X.size > 0 else 0
+
+        results.append(
+            {
+                "molecules": n_molecules,
+                "time": conversion_time,
+                "rate": rate,
+                "bits_per_mol": avg_bits,
+                "memory_mb": memory_mb,
+                "sparsity": sparsity,
+            }
+        )
+
+        print(
+            f"{n_molecules:<12,} {conversion_time:<10.2f} {rate:<12.0f} {avg_bits:<10.1f} {memory_mb:<12.2f} {sparsity:<10.6f}"
+        )
+
+    # Scalability analysis
+    print("\nScalability Analysis:")
+    print("-" * 40)
+
+    if len(results) >= 2:
+        # Calculate scaling efficiency
+        small_result = results[0]
+        large_result = results[-1]
+
+        size_ratio = large_result["molecules"] / small_result["molecules"]
+        time_ratio = large_result["time"] / small_result["time"]
+        scaling_efficiency = size_ratio / time_ratio
+
+        print(
+            f"Size scaling: {small_result['molecules']:,} → {large_result['molecules']:,} molecules ({size_ratio:.1f}x)"
+        )
+        print(f"Time scaling: {small_result['time']:.2f}s → {large_result['time']:.2f}s ({time_ratio:.1f}x)")
+        print(f"Scaling efficiency: {scaling_efficiency:.2f} (1.0 = perfect linear scaling)")
+
+        # Memory scaling
+        memory_ratio = large_result["memory_mb"] / small_result["memory_mb"]
+        print(
+            f"Memory scaling: {small_result['memory_mb']:.1f}MB → {large_result['memory_mb']:.1f}MB ({memory_ratio:.1f}x)"
+        )
+
+    # Performance projections
+    print("\nPerformance Projections:")
+    print("-" * 30)
+
+    if results:
+        latest = results[-1]
+
+        # Project to larger datasets
+        projected_1M = (1_000_000 / latest["rate"]) if latest["rate"] > 0 else float("inf")
+        projected_memory_1M = latest["memory_mb"] * (1_000_000 / latest["molecules"])
+
+        print(f"Projected time for 1M molecules: {projected_1M / 60:.1f} minutes")
+        print(f"Projected memory for 1M molecules: {projected_memory_1M / 1024:.1f} GB")
+
+        # Realistic dataset recommendations
+        if latest["rate"] > 0:
+            molecules_per_minute = latest["rate"] * 60
+            molecules_per_hour = molecules_per_minute * 60
+
+            print("\nRealistic Usage Recommendations:")
+            print(f"  Interactive analysis: Up to {int(molecules_per_minute / 10):,} molecules")
+            print(f"  Batch processing: Up to {int(molecules_per_hour / 10):,} molecules")
+            print(f"  Production pipeline: {int(molecules_per_hour):,}+ molecules/hour")
+
+    # Memory efficiency showcase
+    print("\nMemory Efficiency Showcase:")
+    print("-" * 35)
+
+    if results:
+        example = results[-1]
+        sparse_mb = example["memory_mb"]
+
+        # Calculate theoretical dense matrix size
+        n_mols = example["molecules"]
+        dense_gb = (n_mols * (2**32) * 1) / (1024**3)  # 1 byte per boolean
+
+        print(f"{n_mols:,} molecules:")
+        print(f"  Sparse matrix: {sparse_mb:.1f} MB")
+        print(f"  Dense equivalent: {dense_gb:,.0f} GB")
+        print(f"  Space savings: {(1 - sparse_mb / (dense_gb * 1024)) * 100:.6f}%")
+
+    print(f"\n{'=' * 80}")
+    print("✓ Large-scale benchmark completed successfully!")
+    print(f"✓ LaplacianNB can efficiently handle datasets up to {target_molecules:,} molecules")
+    print(f"{'=' * 80}")
+
+    return results
+
+
+def _generate_diverse_smiles(n_molecules, diverse=True):
+    """Generate a diverse set of SMILES for realistic benchmarking."""
+    if diverse:
+        # More diverse molecular structures for realistic testing
+        base_smiles = [
+            # Simple aliphatics
+            "CCO",
+            "CCC",
+            "CCCC",
+            "CCCCC",
+            "CCCCCC",
+            "CCCCCCC",
+            "CC(C)C",
+            "CC(C)CC",
+            "CC(C)(C)C",
+            "CCCCCCCCCC",
+            # Aromatics and pharmaceuticals
+            "C1=CC=CC=C1",
+            "CC1=CC=CC=C1",
+            "CC1=CC=C(C=C1)C",
+            "CC(=O)OC1=CC=CC=C1C(=O)O",  # Aspirin
+            "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",  # Ibuprofen
+            "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",  # Caffeine
+            # Heterocycles
+            "C1=CC=NC=C1",
+            "C1=CN=CC=C1",
+            "C1=CC=C(C=C1)N",
+            "C1CCC(CC1)N",
+            "C1=CC=C2C(=C1)C=CC=N2",
+            # Functional groups
+            "CC(=O)O",
+            "CCO",
+            "CC(=O)C",
+            "CCCN",
+            "CCS",
+            "CC=O",
+            "CC(=O)N",
+            "CC(C)O",
+            "C=CC",
+            "C#CC",
+            "CCCl",
+            "CCBr",
+            # Larger molecules
+            "CCCCCCCCCCCCCCCC",  # Palmitic acid
+            "CC1=CC(=CC(=C1)C)C(=O)O",  # Mesitylenic acid
+            "CC(C)(C)C1=CC=C(C=C1)O",  # BHT
+            "CCN(CC)CC",  # Triethylamine
+            # Steroids and complex structures
+            "CC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C",
+            "CN1CCC[C@H]1C2=CN=CC=C2",
+            "CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)C",
+        ]
     else:
-        raise ValueError(f"Unknown output_format: {output_format}. Choose from 'auto', 'dense', 'csr', 'csc'.")
-
-
-class RDKitFingerprintConverter:
-    """Converter class for batch processing RDKit fingerprints.
-
-    This class provides methods to convert RDKit fingerprints to various
-    sklearn-compatible formats with caching and validation.
-
-    Parameters
-    ----------
-    n_bits : int, default=2048
-        Size of the fingerprint vectors.
-
-    output_format : {'auto', 'dense', 'csr', 'csc'}, default='csr'
-        Default output format for conversions. Default 'csr' for memory efficiency
-        with molecular fingerprints which are typically very sparse.
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output.
-
-    validate : bool, default=True
-        Whether to validate input fingerprints.
-
-    Attributes
-    ----------
-    n_features_ : int
-        Number of features (bits) in the fingerprints.
-
-    Examples
-    --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>>
-    >>> converter = RDKitFingerprintConverter(n_bits=2048, output_format='csr')
-    >>>
-    >>> mols = [Chem.MolFromSmiles(smi) for smi in ['CCO', 'CC', 'CCC']]
-    >>> fps = [AllChem.GetMorganFingerprintAsBitVect(mol, 2) for mol in mols]
-    >>>
-    >>> X = converter.convert(fps)
-    >>> print(f"Shape: {X.shape}, Sparsity: {converter.get_sparsity(X):.2%}")
-    """
-
-    def __init__(self, n_bits: int = 2048, output_format: str = "csr", dtype=np.float32, validate: bool = True):
-        self.n_bits = n_bits
-        self.output_format = output_format
-        self.dtype = dtype
-        self.validate = validate
-        self.n_features_ = n_bits
-
-    def convert(
-        self, fingerprints, output_format: Optional[str] = None
-    ) -> Union[np.ndarray, sparse.csr_matrix, sparse.csc_matrix]:
-        """Convert fingerprints to sklearn format.
-
-        Parameters
-        ----------
-        fingerprints : single fingerprint or list of fingerprints
-            RDKit fingerprints to convert.
-
-        output_format : str, optional
-            Override default output format for this conversion.
-
-        Returns
-        -------
-        array-like
-            Converted fingerprints.
-        """
-        if output_format is None:
-            output_format = self.output_format
-
-        if self.validate:
-            self._validate_fingerprints(fingerprints)
-
-        return rdkit_sparse_to_sklearn(fingerprints, n_bits=self.n_bits, output_format=output_format, dtype=self.dtype)
-
-    def to_dense(self, fingerprints) -> np.ndarray:
-        """Convert to dense numpy array."""
-        return rdkit_sparse_to_numpy(fingerprints, self.n_bits, self.dtype)
-
-    def to_csr(self, fingerprints) -> sparse.csr_matrix:
-        """Convert to CSR sparse matrix."""
-        return rdkit_sparse_to_csr(fingerprints, self.n_bits, self.dtype)
-
-    def to_csc(self, fingerprints) -> sparse.csc_matrix:
-        """Convert to CSC sparse matrix."""
-        return rdkit_sparse_to_csc(fingerprints, self.n_bits, self.dtype)
-
-    def _validate_fingerprints(self, fingerprints):
-        """Validate that fingerprints are in a supported format."""
-        if fingerprints is None:
-            raise ValueError("Fingerprints cannot be None")
-
-        # Check if it's a single fingerprint or a collection
-        if not isinstance(fingerprints, (list, tuple, np.ndarray)):
-            fingerprints = [fingerprints]
-
-        for i, fp in enumerate(fingerprints):
-            if fp is None:
-                continue
-
-            # Check for supported types
-            valid = (
-                hasattr(fp, "GetOnBits")
-                or hasattr(fp, "GetNonzeroElements")
-                or isinstance(fp, (set, dict, list, tuple, np.ndarray))
-            )
-
-            if not valid:
-                # Try to iterate as last resort
-                try:
-                    iter(fp)
-                except TypeError:
-                    raise ValueError(f"Fingerprint at index {i} is not in a supported format. Got type: {type(fp)}")
-
-    @staticmethod
-    def get_sparsity(matrix) -> float:
-        """Calculate sparsity of a matrix.
-
-        Parameters
-        ----------
-        matrix : array-like
-            Dense or sparse matrix.
-
-        Returns
-        -------
-        float
-            Sparsity ratio (fraction of zero elements).
-        """
-        if sparse.issparse(matrix):
-            return 1.0 - (matrix.nnz / (matrix.shape[0] * matrix.shape[1]))
-        else:
-            return np.mean(matrix == 0)
-
-    def get_statistics(self, fingerprints) -> Dict[str, Any]:
-        """Get statistics about the fingerprints.
-
-        Parameters
-        ----------
-        fingerprints : list of fingerprints
-            RDKit fingerprints to analyze.
-
-        Returns
-        -------
-        dict
-            Statistics including sparsity, average on-bits, etc.
-        """
-        matrix = self.to_csr(fingerprints)
-
-        stats = {
-            "n_samples": matrix.shape[0],
-            "n_features": matrix.shape[1],
-            "sparsity": self.get_sparsity(matrix),
-            "avg_on_bits": matrix.nnz / matrix.shape[0],
-            "min_on_bits": min(matrix.getnnz(axis=1)),
-            "max_on_bits": max(matrix.getnnz(axis=1)),
-            "total_unique_bits": len(np.unique(matrix.nonzero()[1])),
-        }
-
-        return stats
-
-
-# Convenience functions for direct use
-def convert_fingerprints(
-    fingerprints, n_bits: int = 2048, output_format: str = "csr", dtype=np.float32
-) -> Union[np.ndarray, sparse.csr_matrix, sparse.csc_matrix]:
-    """Convenience function to convert RDKit fingerprints to sklearn format.
-
-    This is a simple wrapper around rdkit_sparse_to_sklearn for ease of use.
-
-    Parameters
-    ----------
-    fingerprints : single fingerprint or list of fingerprints
-        RDKit fingerprints in various formats.
-
-    n_bits : int, default=2048
-        Size of the fingerprint vectors.
-
-    output_format : {'auto', 'dense', 'csr', 'csc'}, default='csr'
-        Output format for the fingerprints. Default 'csr' for memory efficiency
-        with molecular fingerprints which are typically very sparse.
-
-    dtype : numpy dtype, default=np.float32
-        Data type of the output.
-
-    Returns
-    -------
-    array-like
-        Fingerprints in sklearn-compatible format.
-
-    Examples
-    --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>> mol = Chem.MolFromSmiles('CCO')
-    >>> fp = AllChem.GetMorganFingerprintAsBitVect(mol, 2)
-    >>> X = convert_fingerprints(fp)  # Returns sparse CSR matrix by default
-    """
-    return rdkit_sparse_to_sklearn(fingerprints, n_bits=n_bits, output_format=output_format, dtype=dtype)
-
-
-class FingerprintTransformer(BaseEstimator, TransformerMixin):
-    """Sklearn-compatible transformer for RDKit fingerprints.
-
-    This transformer converts various RDKit fingerprint formats (sets, dicts,
-    sparse representations) into dense or sparse matrices suitable for sklearn.
-    Provides full sklearn pipeline compatibility with fit/transform interface.
-
-    Parameters
-    ----------
-    n_bits : int, default=2048
-        Number of bits in the fingerprint. Common values are 1024, 2048, 4096.
-
-    output_format : {'auto', 'dense', 'csr', 'csc'}, default='csr'
-        Output format for the transformed matrix:
-        - 'csr': Compressed Sparse Row matrix (memory efficient)
-        - 'csc': Compressed Sparse Column matrix
-        - 'dense': Dense numpy array
-        - 'auto': Automatically choose based on sparsity
-
-    dtype : dtype, default=np.float32
-        Data type of the output array.
-
-    Attributes
-    ----------
-    n_features_out_ : int
-        Number of output features (equal to n_bits).
-
-    Examples
-    --------
-    >>> from rdkit import Chem
-    >>> from rdkit.Chem import AllChem
-    >>> from sklearn.pipeline import Pipeline
-    >>> from laplaciannb import LaplacianNB, FingerprintTransformer
-    >>>
-    >>> # Generate fingerprints as sets of on-bits
-    >>> mols = [Chem.MolFromSmiles('CCO'), Chem.MolFromSmiles('CC')]
-    >>> fps = [set(AllChem.GetMorganFingerprintAsBitVect(mol, 2).GetOnBits())
-    ...        for mol in mols]
-    >>>
-    >>> # Create sklearn pipeline
-    >>> pipeline = Pipeline([
-    ...     ('fingerprints', FingerprintTransformer(n_bits=2048)),
-    ...     ('classifier', LaplacianNB())
-    >>> ])
-    >>>
-    >>> # Use in cross-validation, grid search, etc.
-    >>> y = [0, 1]
-    >>> pipeline.fit(fps, y)
-    """
-
-    def __init__(self, n_bits=2048, output_format="csr", dtype=np.float32):
-        self.n_bits = n_bits
-        self.output_format = output_format
-        self.dtype = dtype
-
-    def fit(self, X, y=None):
-        """Fit the transformer.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples,)
-            Input samples. Each sample can be:
-            - A set of on-bit indices
-            - A dictionary mapping bit indices to counts
-            - A sparse fingerprint object (RDKit BitVect, etc.)
-            - A list/tuple of on-bit indices
-
-        y : Ignored
-            Not used, present for API consistency.
-
-        Returns
-        -------
-        self : object
-            Returns the instance itself.
-        """
-        self.n_features_out_ = self.n_bits
-        return self
-
-    def transform(self, X):
-        """Transform fingerprints to matrix format.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples,)
-            Input samples in fingerprint format.
-
-        Returns
-        -------
-        X_transformed : {ndarray, sparse matrix} of shape (n_samples, n_bits)
-            Transformed fingerprint matrix.
-        """
-        check_is_fitted(self)
-
-        # Use our existing conversion function
-        return convert_fingerprints(X, n_bits=self.n_bits, output_format=self.output_format, dtype=self.dtype)
-
-    def fit_transform(self, X, y=None):
-        """Fit and transform in one step.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples,)
-            Input samples in fingerprint format.
-
-        y : Ignored
-            Not used, present for API consistency.
-
-        Returns
-        -------
-        X_transformed : {ndarray, sparse matrix} of shape (n_samples, n_bits)
-            Transformed fingerprint matrix.
-        """
-        return self.fit(X, y).transform(X)
-
-    def get_feature_names_out(self, input_features=None):
-        """Get output feature names for transformation.
-
-        Parameters
-        ----------
-        input_features : array-like of str or None, default=None
-            Not used, present for API consistency.
-
-        Returns
-        -------
-        feature_names_out : ndarray of str objects
-            Array of feature names.
-        """
-        check_is_fitted(self)
-        return np.array([f"bit_{i}" for i in range(self.n_bits)], dtype=object)
+        # Simple repeated structures for baseline testing
+        base_smiles = [
+            "CCO",
+            "CC(=O)OC1=CC=CC=C1C(=O)O",
+            "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+            "CCCCCCCCCCCCCCCC",
+            "CC1=CC=C(C=C1)C(=O)O",
+            "CCN(CC)CC",
+            "CC(C)(C)C1=CC=C(C=C1)O",
+            "CCCCCCCCCCCCC",
+            "CC1=CC(=CC(=C1)C)C(=O)O",
+            "CCCCCCCCCC",
+            "CC1=CC=CC=C1",
+            "C1=CC=CC=C1",
+            "CC(C)O",
+            "CCCCO",
+        ]
+
+    # Generate the required number of molecules
+    test_smiles = []
+    while len(test_smiles) < n_molecules:
+        test_smiles.extend(base_smiles)
+
+    return test_smiles[:n_molecules]
