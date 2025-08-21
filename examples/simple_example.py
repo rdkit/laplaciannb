@@ -43,7 +43,7 @@ probabilities = clf.predict_proba(X)
 print("\nResults:")
 print("-" * 40)
 for i, (smiles_str, true_label, pred_label, prob) in enumerate(zip(smiles, y, predictions, probabilities)):
-    print(f"Molecule {i+1}: {smiles_str[:20]}")
+    print(f"Molecule {i + 1}: {smiles_str[:20]}")
     print(f"  True: {true_label}, Predicted: {pred_label}")
     print(f"  Probabilities: [Inactive: {prob[0]:.3f}, Active: {prob[1]:.3f}]")
     print()
@@ -74,7 +74,7 @@ for i, smiles_str in enumerate(smiles):
         # Convert to the same uint32 indices used in the matrix
         converted_indices = [int(np.uint32(bit & 0xFFFFFFFF)) for bit in original_indices]
 
-        print(f"\nMolecule {i+1}: {smiles_str}")
+        print(f"\nMolecule {i + 1}: {smiles_str}")
         print(f"  Original indices: {original_indices[:10]}{'...' if len(original_indices) > 10 else ''}")
         print(f"  Converted indices: {converted_indices[:10]}{'...' if len(converted_indices) > 10 else ''}")
         print(f"  Total fingerprint bits: {len(original_indices)}")
@@ -89,7 +89,7 @@ for i in range(X.shape[0]):
     end_idx = X.indptr[i + 1]
     row_indices = X.indices[start_idx:end_idx]
 
-    print(f"Molecule {i+1} active bits: {row_indices[:10]}{'...' if len(row_indices) > 10 else ''}")
+    print(f"Molecule {i + 1} active bits: {row_indices[:10]}{'...' if len(row_indices) > 10 else ''}")
     print(f"  Total: {len(row_indices)} active bits")
 
 print("\n✓ You can now map back to original RDKit fingerprint indices")

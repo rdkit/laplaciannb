@@ -91,7 +91,7 @@ def rdkit_to_csr(smiles_list, radius=2, show_progress=True):
     print(f"Conversion completed in {conversion_time:.3f} seconds")
     print(f"Valid molecules: {valid_molecules}/{len(mol_list)}")
     print(f"Total fingerprint bits: {total_bits:,}")
-    print(f"Average bits per molecule: {total_bits/valid_molecules:.1f}")
+    print(f"Average bits per molecule: {total_bits / valid_molecules:.1f}")
     print(f"Matrix shape: {matrix.shape}")
     print(f"Matrix sparsity: {sparsity:.6f}")
     print(f"Memory usage: {(matrix.data.nbytes + matrix.indices.nbytes + matrix.indptr.nbytes) / 1024**2:.2f} MB")
@@ -157,7 +157,7 @@ def benchmark_fingerprint_conversion(n_molecules=100000, radii=[2], molecules_pe
     print("100 molecules, radius=2:")
     print(f"  Sparse matrix: {sparse_memory:.2f} MB")
     print(f"  Dense equivalent: {dense_memory:,.0f} MB")
-    print(f"  Memory reduction: {(1 - sparse_memory/dense_memory)*100:.3f}%")
+    print(f"  Memory reduction: {(1 - sparse_memory / dense_memory) * 100:.3f}%")
 
     # Throughput summary
     print("\nThroughput Summary:")
@@ -242,7 +242,7 @@ def benchmark_large_scale_conversion(target_molecules=100000, test_sizes=None, r
     gen_time = time.time() - start_gen
 
     print(f"Dataset generation completed in {gen_time:.2f} seconds")
-    print(f"Average generation rate: {target_molecules/gen_time:.0f} molecules/second")
+    print(f"Average generation rate: {target_molecules / gen_time:.0f} molecules/second")
 
     # Performance tracking
     results = []
@@ -322,8 +322,8 @@ def benchmark_large_scale_conversion(target_molecules=100000, test_sizes=None, r
         projected_1M = (1_000_000 / latest["rate"]) if latest["rate"] > 0 else float("inf")
         projected_memory_1M = latest["memory_mb"] * (1_000_000 / latest["molecules"])
 
-        print(f"Projected time for 1M molecules: {projected_1M/60:.1f} minutes")
-        print(f"Projected memory for 1M molecules: {projected_memory_1M/1024:.1f} GB")
+        print(f"Projected time for 1M molecules: {projected_1M / 60:.1f} minutes")
+        print(f"Projected memory for 1M molecules: {projected_memory_1M / 1024:.1f} GB")
 
         # Realistic dataset recommendations
         if latest["rate"] > 0:
@@ -331,8 +331,8 @@ def benchmark_large_scale_conversion(target_molecules=100000, test_sizes=None, r
             molecules_per_hour = molecules_per_minute * 60
 
             print("\nRealistic Usage Recommendations:")
-            print(f"  Interactive analysis: Up to {int(molecules_per_minute/10):,} molecules")
-            print(f"  Batch processing: Up to {int(molecules_per_hour/10):,} molecules")
+            print(f"  Interactive analysis: Up to {int(molecules_per_minute / 10):,} molecules")
+            print(f"  Batch processing: Up to {int(molecules_per_hour / 10):,} molecules")
             print(f"  Production pipeline: {int(molecules_per_hour):,}+ molecules/hour")
 
     # Memory efficiency showcase
@@ -350,12 +350,12 @@ def benchmark_large_scale_conversion(target_molecules=100000, test_sizes=None, r
         print(f"{n_mols:,} molecules:")
         print(f"  Sparse matrix: {sparse_mb:.1f} MB")
         print(f"  Dense equivalent: {dense_gb:,.0f} GB")
-        print(f"  Space savings: {(1 - sparse_mb/(dense_gb*1024))*100:.6f}%")
+        print(f"  Space savings: {(1 - sparse_mb / (dense_gb * 1024)) * 100:.6f}%")
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("✓ Large-scale benchmark completed successfully!")
     print(f"✓ LaplacianNB can efficiently handle datasets up to {target_molecules:,} molecules")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     return results
 
