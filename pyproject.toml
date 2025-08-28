@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "laplaciannb"
-version = "0.6.1"
+dynamic = ["version"]
 description = "**LaplacianNB** is a Python module developed at **Novartis AG** for Naive Bayes classifier for laplacian modified models based on scikit-learn Naive Bayes implementation."
 authors = [
     {name = "Bartosz Baranowski",email = "bartosz.baranowski@novartis.com"},
@@ -13,17 +13,22 @@ dependencies = [
     "rdkit>=2024.3.5",
     "scikit-learn>=1.7.0",
     "pandas>=2.2.3",
-    "scipy>=1.6.0"
+    "scipy>=1.6.0",
+    "tqdm>=4.67.1",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "BSD 3"}
 
 [dependency-groups]
-dev = [
-    "pytest>=8.4.1",
+test = [
+    "ruff>=0.7.2",
+    "pytest>=8.3.3",
+    "pytest-cov>=4.0.0",
+    "coverage[toml]>=7.0.0",
+    "pre-commit>=4.0.1",
+    "psutil>=7.0.0",
 ]
-test = ["ruff>=0.7.2", "pytest>=8.3.3", "pre-commit>=4.0.1"]
 
 [tool.ruff]
 line-length = 119
@@ -55,3 +60,38 @@ skip-magic-trailing-comma = false
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
 
+[tool.setuptools.dynamic]
+version = {attr = "laplaciannb.__version__"}
+
+[tool.coverage.run]
+source = ["src"]
+relative_files = true
+omit = [
+    "tests/*",
+    "*/tests/*",
+    "test_*",
+    "*/.venv/*",
+    "*/site-packages/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+skip_covered = false
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.coverage.html]
+directory = "htmlcov"

@@ -1,0 +1,142 @@
+name: Auto-publish Development Versions
+
+# Trigger on pushes to develop or when PR is merged to develop
+on:
+  push:
+    branches:
+      - develop
+      - "feature/**"
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
+
+jobs:
+  check-changes:
+    name: Check if code changed
+    runs-on: ubuntu-latest
+    outputs:
+      code-changed: ${{ steps.changes.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'pyproject.toml'
+              - 'tests/**'
+
+  publish-dev:
+    name: Publish development version
+    runs-on: ubuntu-latest
+    needs: check-changes
+    # Only run if code changed and on correct triggers
+    if: |
+      needs.check-changes.outputs.code-changed == 'true' && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+        (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'develop')
+      )
+    defaults:
+      run:
+        shell: bash
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Setup build environment
+        run: |
+          uv sync --group test --no-dev
+          uv add --dev build twine
+
+      - name: Run tests before publishing
+        run: |
+          uv run coverage run -m pytest tests/ -x --tb=short
+
+      - name: Generate development version
+        id: version
+        run: |
+          # Get base version
+          BASE_VERSION=$(uv run python -c "import sys; sys.path.insert(0, 'src'); from laplaciannb import __version__; print(__version__)")
+          echo "Base version: $BASE_VERSION"
+
+          # Generate dev version with short commit hash and timestamp
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +%Y%m%d%H%M)
+          DEV_VERSION="${BASE_VERSION}.dev${TIMESTAMP}"
+
+          echo "Development version: $DEV_VERSION"
+          echo "dev_version=$DEV_VERSION" >> $GITHUB_OUTPUT
+
+          # Update version in __init__.py
+          sed -i "s/__version__ = \"$BASE_VERSION\"/__version__ = \"$DEV_VERSION\"/" src/laplaciannb/__init__.py
+
+          # Verify version was updated
+          UPDATED_VERSION=$(uv run python -c "import sys; sys.path.insert(0, 'src'); from laplaciannb import __version__; print(__version__)")
+          echo "Updated version: $UPDATED_VERSION"
+
+      - name: Build distribution
+        run: |
+          uv run python -m build
+
+      - name: Validate distribution
+        run: |
+          uv run twine check dist/*
+
+          # Test installation with uv
+          uv run pip install dist/*.whl
+          uv run python -c "import laplaciannb; print(f'Installed version: {laplaciannb.__version__}')"
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          verbose: true
+          print-hash: true
+
+      - name: Create GitHub summary
+        run: |
+          echo "## 🚀 Development Version Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ steps.version.outputs.dev_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "pip install laplaciannb==${{ steps.version.outputs.dev_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Or install latest development version:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "pip install --pre laplaciannb" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Development version published!**\n\n**Version:** \`${{ steps.version.outputs.dev_version }}\`\n\nInstall with:\n\`\`\`bash\npip install laplaciannb==${{ steps.version.outputs.dev_version }}\n\`\`\``
+            })
