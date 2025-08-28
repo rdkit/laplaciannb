@@ -8,7 +8,6 @@
 <p align="center">
   <a href="https://pypi.org/project/laplaciannb/"><img src="https://img.shields.io/pypi/v/laplaciannb.svg" alt="PyPI Version"></a>
   <a href="https://pypi.org/project/laplaciannb/"><img src="https://img.shields.io/pypi/dm/laplaciannb.svg" alt="PyPI Downloads"></a>
-  <a href="https://img.shields.io/pypi/pyversions/laplaciannb"><img src="https://img.shields.io/pypi/pyversions/laplaciannb.svg" alt="Python Versions"></a>
   <a href="https://github.com/rdkit/laplaciannb/actions/workflows/ruff.yml"><img src="https://github.com/rdkit/laplaciannb/workflows/Code%20Quality%20Checks/badge.svg" alt="Code Quality"></a>
   <a href="https://github.com/rdkit/laplaciannb/actions/workflows/coverage.yml"><img src="https://github.com/rdkit/laplaciannb/workflows/Test%20Coverage/badge.svg" alt="Test Coverage"></a>
   <a href="https://github.com/rdkit/laplaciannb/actions/workflows/security.yml"><img src="https://github.com/rdkit/laplaciannb/workflows/Security%20Scanning/badge.svg" alt="Security Scan"></a>
